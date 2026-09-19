@@ -33,40 +33,40 @@ const authHeader = () => ({
 })
 
 export const createProjectAPI = async (data) => {
-    return await commonAPI('POST', `${serverURL}/projects`, data, authHeader())
+    return await commonAPI('POST', `${serverURL}/api/projects`, data, authHeader())
 }
 
 export const getMyProjectsAPI = async () => {
-    return await commonAPI('GET', `${serverURL}/projects`, {}, authHeader())
+    return await commonAPI('GET', `${serverURL}/api/projects`, {}, authHeader())
 }
 
 export const getProjectByIdAPI = async (id) => {
-    return await commonAPI('GET', `${serverURL}/projects/${id}`, {}, authHeader())
+    return await commonAPI('GET', `${serverURL}/api/projects/${id}`, {}, authHeader())
 }
 
 export const updateProjectAPI = async (id, data) => {
-    return await commonAPI('PUT', `${serverURL}/projects/${id}`, data, authHeader())
+    return await commonAPI('PUT', `${serverURL}/api/projects/${id}`, data, authHeader())
 }
 
 export const deleteProjectAPI = async (id) => {
-    return await commonAPI('DELETE', `${serverURL}/projects/${id}`, {}, authHeader())
+    return await commonAPI('DELETE', `${serverURL}/api/projects/${id}`, {}, authHeader())
 }
 
 export const uploadProjectZipAPI = async (projectId, formData) => {
-    return await commonAPI('POST', `${serverURL}/projects/${projectId}/files/upload`, formData, {
+    return await commonAPI('POST', `${serverURL}/api/${projectId}/files/upload`, formData, {
         Authorization: `Bearer ${localStorage.getItem("token")}`
         // no Content-Type here - the browser sets the multipart boundary itself
     })
 }
 
 export const getProjectFilesAPI = async (projectId) => {
-    return await commonAPI('GET', `${serverURL}/projects/${projectId}/files`, {}, authHeader())
+    return await commonAPI('GET', `${serverURL}/api/${projectId}/files`, {}, authHeader())
 }
 
 export const getFileByIdAPI = async (projectId, fileId) => {
-    return await commonAPI('GET', `${serverURL}/projects/${projectId}/files/${fileId}`, {}, authHeader())
+    return await commonAPI('GET', `${serverURL}/api/${projectId}/files/${fileId}`, {}, authHeader())
 }
 
 export const deleteFileAPI = async (projectId, fileId) => {
-    return await commonAPI('DELETE', `${serverURL}/projects/${projectId}/files/${fileId}`, {}, authHeader())
+    return await commonAPI('DELETE', `${serverURL}/api/${projectId}/files/${fileId}`, {}, authHeader())
 }

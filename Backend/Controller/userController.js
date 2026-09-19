@@ -194,16 +194,16 @@ exports.forgotPassword = async (req, res) => {
         user.resetPasswordExpiry = new Date(Date.now() + 10 * 60 * 1000)
         await user.save()
 
-        await sendMail({
-            to: email,
-            subject: "Reset Your Password",
-            html: `
+        await sendMail(
+             email,
+          "Reset Your Password",
+            `
               <h3>Password Reset Request</h3>
               <p>Click the link below to reset your password:</p>
               <a href="${resetLink}" target="_blank">${resetLink}</a>
               <p>This link will expire in 10 minutes.</p>
             `
-        })
+        )
 
         return res.status(200).json({ message: "Password reset link sent successfully" })
     }
