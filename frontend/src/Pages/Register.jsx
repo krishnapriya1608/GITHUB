@@ -48,7 +48,7 @@ function Register() {
 
             {/* Navigation Header */}
             <header className="relative z-10 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full">
-                <div className="font-bold text-xl tracking-wider text-white">LOGO</div>
+                <div className="font-bold text-xl tracking-wider text-white">COSMOS®</div>
                 <nav className="flex items-center space-x-8 text-sm text-gray-300">
                     <Link to="/" className="hover:text-white transition-colors">Home</Link>
                     <a href="#features" className="hover:text-white transition-colors">Features</a>
@@ -154,29 +154,12 @@ function Register() {
                                     />
                                 </div>
 
-                                {/* Role Select */}
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-gray-300 tracking-wide">
-                                        Select Role
-                                    </label>
-                                    <select
-                                        name="role"
-                                        value={data.role}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-3 rounded-2xl bg-[#3f3a52]/50 border border-transparent focus:border-[#9181c4]/60 text-sm text-white outline-none transition-all cursor-pointer"
-                                    >
-                                        <option value="customer" className="bg-[#282436]">Customer</option>
-                                        <option value="waiter" className="bg-[#282436]">Waiter</option>
-                                        <option value="kitchen" className="bg-[#282436]">Kitchen</option>
-                                        <option value="delivery" className="bg-[#282436]">Delivery</option>
-                                        <option value="admin" className="bg-[#282436]">Admin</option>
-                                    </select>
-                                </div>
+                              
 
                                 {/* Submit Button */}
                                 <button
                                     type="submit"
-                                    className="w-full py-3.5 mt-2 rounded-2xl bg-[#8c82cb] hover:bg-[#7b71ba] text-white font-bold text-xs uppercase tracking-wider transition-all duration-200 shadow-lg shadow-[#8c82cb]/20"
+                                    className="w-full py-3.5 mt-2 rounded-2xl bg-[#8a86a4] hover:bg-[#7b71ba] text-white font-bold text-xs uppercase tracking-wider transition-all duration-200 shadow-lg shadow-[#8c82cb]/20"
                                 >
                                     REGISTER
                                 </button>
@@ -188,8 +171,14 @@ function Register() {
             </main>
 
             {/* Footer Bar */}
-            <footer className="relative z-10 w-full bg-[#8c82cb]/80 backdrop-blur-md py-3 text-center text-xs font-medium text-white/90 border-t border-white/10">
-                © Copyright 2026
+           <footer className="relative z-10 w-full px-8 py-4 flex items-center justify-between text-[10px] text-gray-600 border-t border-white/5">
+                <div className="flex items-center space-x-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
+                    <span>Cosmos</span>
+                </div>
+                <div>
+                    curated by <span className="font-semibold text-gray-400">Mobbin</span>
+                </div>
             </footer>
         </div>
     )
