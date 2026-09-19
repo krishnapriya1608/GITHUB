@@ -51,3 +51,22 @@ export const updateProjectAPI = async (id, data) => {
 export const deleteProjectAPI = async (id) => {
     return await commonAPI('DELETE', `${serverURL}/projects/${id}`, {}, authHeader())
 }
+
+export const uploadProjectZipAPI = async (projectId, formData) => {
+    return await commonAPI('POST', `${serverURL}/projects/${projectId}/files/upload`, formData, {
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+        // no Content-Type here - the browser sets the multipart boundary itself
+    })
+}
+
+export const getProjectFilesAPI = async (projectId) => {
+    return await commonAPI('GET', `${serverURL}/projects/${projectId}/files`, {}, authHeader())
+}
+
+export const getFileByIdAPI = async (projectId, fileId) => {
+    return await commonAPI('GET', `${serverURL}/projects/${projectId}/files/${fileId}`, {}, authHeader())
+}
+
+export const deleteFileAPI = async (projectId, fileId) => {
+    return await commonAPI('DELETE', `${serverURL}/projects/${projectId}/files/${fileId}`, {}, authHeader())
+}

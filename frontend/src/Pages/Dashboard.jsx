@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { createProjectAPI, getMyProjectsAPI, deleteProjectAPI } from '../service/allAPI'
 
 function Dashboard() {
@@ -121,7 +121,9 @@ function Dashboard() {
                     {projects.map((project) => (
                         <li key={project._id} className="project-item">
                             <div>
-                                <strong>{project.name}</strong>
+                                <Link to={`/projects/${project._id}`}>
+                                    <strong>{project.name}</strong>
+                                </Link>
                                 {project.description && <p>{project.description}</p>}
                                 <span className="project-date">
                                     Created {new Date(project.createdAt).toLocaleDateString()}
