@@ -14,7 +14,7 @@ const nodemailer = require("nodemailer");
  
  await transporter.sendMail({
   from: process.env.USER,
-  to: email,
+  to:to,
  subject: subject,
  html: text });
  

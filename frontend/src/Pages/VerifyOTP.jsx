@@ -6,7 +6,8 @@ function VerifyOTP() {
     const navigate = useNavigate()
     const [otp, setOtp] = useState("")
     const email = localStorage.getItem("email")
-
+    console.log("Email:", email);
+    console.log("OTP received:", otp);
     const handleVerifyOtp = async (e) => {
         e.preventDefault()
         if (!otp) {

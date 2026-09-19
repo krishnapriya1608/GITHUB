@@ -2,27 +2,27 @@ import serverURL from './serverURL'
 import commonAPI from './commonAPI'
 
 export const registerAPI = async (data) => {
-    return await commonAPI('POST', `${serverURL}/register`, data)
+    return await commonAPI('POST', `${serverURL}/api/register`, data)
 }
 
 export const loginAPI = async (data) => {
-    return await commonAPI('POST', `${serverURL}/login`, data)
+    return await commonAPI('POST', `${serverURL}/api/login`, data)
 }
 
 export const verifyOtpAPI = async (data) => {
-    return await commonAPI('POST', `${serverURL}/verifyOtp`, data)
+    return await commonAPI('POST', `${serverURL}/api/verifyOtp`, data)
 }
 
 export const resendOtpAPI = async (data) => {
-    return await commonAPI('POST', `${serverURL}/resendOtp`, data)
+    return await commonAPI('POST', `${serverURL}/api/resendOtp`, data)
 }
 
 export const forgotPasswordAPI = async (data) => {
-    return await commonAPI('POST', `${serverURL}/forgotPassword`, data)
+    return await commonAPI('POST', `${serverURL}/api/forgotPassword`, data)
 }
 
 export const resetPasswordAPI = async (token, data) => {
-    return await commonAPI('POST', `${serverURL}/resetPassword/${token}`, data)
+    return await commonAPI('POST', `${serverURL}/api/resetPassword/${token}`, data)
 }
 
 

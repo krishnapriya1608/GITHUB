@@ -35,15 +35,17 @@ exports.registerUser = async (req, res) => {
             isActive: false
         })
 
-        await newUser.save()
+       
 
-        await sendMail({
-            to: email,
-            subject: "OTP for registration",
-            message: `Your OTP is ${otp}. It expires in 5 minutes.`
-        })
+        await sendMail(
+             email,
+             "OTP for registration",
+             `Your OTP is ${otp}. It expires in 5 minutes.`
+        )
+         await newUser.save()
 
         res.status(200).json({ message: "User registered successfully. OTP sent to email.", userID: newUser._id })
+        
     }
     catch (err) {
         console.log(err.message)

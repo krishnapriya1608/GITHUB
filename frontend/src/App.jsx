@@ -5,6 +5,7 @@ import Login from './Pages/Login'
 import ForgotPassword from './Pages/ForgotPassword'
 import ResetPassword from './Pages/ResetPassword'
 import Dashboard from './Pages/Dashboard'
+import ProjectDetail from './Pages/ProjectDetail'
 import './App.css'
 
 function Home() {
