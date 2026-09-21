@@ -1,7 +1,6 @@
 from fastapi import FastAPI, UploadFile, File
 from file_processor import process_file
 
-
 app = FastAPI()
 
 
@@ -13,25 +12,23 @@ def home():
 
 
 @app.post("/process-files")
-async def process_files(files: list[UploadFile] = File(...)):
+async def process_files(file: UploadFile = File(...)):
 
-    processed_files = []
+    content = await file.read()
 
-    for file in files:
+    text = content.decode("utf-8", errors="ignore")
 
-        content = await file.read()
+    result = process_file(
+        file.filename,
+        text
+    )
 
-        text = content.decode("utf-8", errors="ignore")
-
-        result = process_file(
-            file.filename,
-            text
-        )
-
-        if result:
-            processed_files.append(result)
+    if result is None:
+        return {
+            "message": "This file type is not supported"
+        }
 
     return {
-        "message": "Files processed successfully",
-        "files": processed_files
+        "message": "File processed successfully",
+        "file": result
     }
