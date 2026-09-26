@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { registerAPI } from '../service/allAPI'
+import gsap from 'gsap'
 
 function Register() {
     const navigate = useNavigate()
@@ -10,6 +11,52 @@ function Register() {
         password: "",
         role: "customer"
     })
+
+    // GSAP Animation Refs
+    const glowRef = useRef(null)
+    const headerRef = useRef(null)
+    const leftColRef = useRef(null)
+    const cardRef = useRef(null)
+    const formFieldsRef = useRef([])
+
+    useEffect(() => {
+        const ctx = gsap.context(() => {
+            // 1. Glowing background pulse animation
+            gsap.to(glowRef.current, {
+                scale: 1.25,
+                opacity: 0.25,
+                duration: 4,
+                repeat: -1,
+                yoyo: true,
+                ease: "sine.inOut"
+            })
+
+            // 2. Timeline for smooth staggered entrance
+            const tl = gsap.timeline({ defaults: { ease: "power3.out" } })
+
+            tl.fromTo(headerRef.current, 
+                { y: -30, opacity: 0 }, 
+                { y: 0, opacity: 1, duration: 0.8 }
+            )
+            .fromTo(leftColRef.current?.children, 
+                { y: 30, opacity: 0 }, 
+                { y: 0, opacity: 1, duration: 0.8, stagger: 0.15 }, 
+                "-=0.4"
+            )
+            .fromTo(cardRef.current, 
+                { y: 40, opacity: 0, scale: 0.95 }, 
+                { y: 0, opacity: 1, scale: 1, duration: 1 }, 
+                "-=0.6"
+            )
+            .fromTo(formFieldsRef.current, 
+                { y: 20, opacity: 0 }, 
+                { y: 0, opacity: 1, duration: 0.5, stagger: 0.1 }, 
+                "-=0.4"
+            )
+        })
+
+        return () => ctx.revert() // Cleanup GSAP animations on unmount
+    }, [])
 
     const handleChange = (e) => {
         setData({
@@ -44,11 +91,16 @@ function Register() {
     return (
         <div className="min-h-screen bg-[#0d0c11] text-white font-sans flex flex-col justify-between relative overflow-hidden">
             {/* Background Purple Glow Effects */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#8a72cf]/15 blur-[140px] rounded-full pointer-events-none" />
+            <div 
+                ref={glowRef}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#8a72cf]/15 blur-[140px] rounded-full pointer-events-none" 
+            />
 
             {/* Navigation Header */}
-            <header className="relative z-10 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full">
-                <div className="font-bold text-xl tracking-wider text-white">COSMOS®</div>
+            <header ref={headerRef} className="relative z-10 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full">
+                <div style={{ fontFamily: "Arima, system-ui" }} className="font-bold text-xl tracking-wider text-white">
+                    COSMOS®
+                </div>
                 <nav className="flex items-center space-x-8 text-sm text-gray-300">
                     <Link to="/" className="hover:text-white transition-colors">Home</Link>
                     <a href="#features" className="hover:text-white transition-colors">Features</a>
@@ -61,7 +113,7 @@ function Register() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center w-full">
                     
                     {/* Left Column: Heading & Social Login */}
-                    <div className="lg:col-span-6 space-y-6">
+                    <div ref={leftColRef} className="lg:col-span-6 space-y-6">
                         <h1 className="text-5xl font-black tracking-tight text-white uppercase">
                             REGISTER
                         </h1>
@@ -73,7 +125,7 @@ function Register() {
                         <div className="pt-2">
                             <button
                                 type="button"
-                                className="flex items-center justify-center space-x-3 w-full sm:w-auto px-6 py-3 rounded-full border border-gray-700/80 bg-black/40 hover:bg-black/60 text-sm font-medium transition-all duration-200"
+                                className="flex items-center justify-center space-x-3 w-full sm:w-auto px-6 py-3 rounded-full border border-gray-700/80 bg-black/40 hover:bg-black/60 text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                             >
                                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                                     <path
@@ -107,10 +159,13 @@ function Register() {
 
                     {/* Right Column: Glassmorphism Card Form */}
                     <div className="lg:col-span-6 flex justify-center lg:justify-end">
-                        <div className="w-full max-w-md p-8 rounded-3xl bg-[#282436]/40 backdrop-blur-xl border border-[#9181c4]/30 shadow-2xl space-y-5">
+                        <div 
+                            ref={cardRef} 
+                            className="w-full max-w-md p-8 rounded-3xl bg-[#282436]/40 backdrop-blur-xl border border-[#9181c4]/30 shadow-2xl space-y-5"
+                        >
                             <form onSubmit={handleRegister} className="space-y-4">
                                 {/* Name Input */}
-                                <div className="space-y-1.5">
+                                <div ref={(el) => (formFieldsRef.current[0] = el)} className="space-y-1.5">
                                     <label className="text-xs font-medium text-gray-300 tracking-wide">
                                         Full Name
                                     </label>
@@ -125,7 +180,7 @@ function Register() {
                                 </div>
 
                                 {/* Email Input */}
-                                <div className="space-y-1.5">
+                                <div ref={(el) => (formFieldsRef.current[1] = el)} className="space-y-1.5">
                                     <label className="text-xs font-medium text-gray-300 tracking-wide">
                                         E-Mail
                                     </label>
@@ -140,7 +195,7 @@ function Register() {
                                 </div>
 
                                 {/* Password Input */}
-                                <div className="space-y-1.5">
+                                <div ref={(el) => (formFieldsRef.current[2] = el)} className="space-y-1.5">
                                     <label className="text-xs font-medium text-gray-300 tracking-wide">
                                         Password
                                     </label>
@@ -154,15 +209,15 @@ function Register() {
                                     />
                                 </div>
 
-                              
-
                                 {/* Submit Button */}
-                                <button
-                                    type="submit"
-                                    className="w-full py-3.5 mt-2 rounded-2xl bg-[#8a86a4] hover:bg-[#7b71ba] text-white font-bold text-xs uppercase tracking-wider transition-all duration-200 shadow-lg shadow-[#8c82cb]/20"
-                                >
-                                    REGISTER
-                                </button>
+                                <div ref={(el) => (formFieldsRef.current[3] = el)}>
+                                    <button
+                                        type="submit"
+                                        className="w-full py-3.5 mt-2 rounded-2xl bg-[#8a86a4] hover:bg-[#7b71ba] text-white font-bold text-xs uppercase tracking-wider transition-all duration-200 shadow-lg shadow-[#8c82cb]/20 active:scale-[0.98]"
+                                    >
+                                        REGISTER
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -171,13 +226,13 @@ function Register() {
             </main>
 
             {/* Footer Bar */}
-           <footer className="relative z-10 w-full px-8 py-4 flex items-center justify-between text-[10px] text-gray-600 border-t border-white/5">
+            <footer className="relative z-10 w-full px-8 py-4 flex items-center justify-between text-[10px] text-gray-600 border-t border-white/5">
                 <div className="flex items-center space-x-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
                     <span>Cosmos</span>
                 </div>
                 <div>
-                    copyright  <span className="font-semibold text-gray-400">@ 2026</span>
+                    copyright <span className="font-semibold text-gray-400">@ 2026</span>
                 </div>
             </footer>
         </div>
