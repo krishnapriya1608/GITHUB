@@ -168,7 +168,7 @@ function Login() {
                             <div className="text-[11px] text-gray-500">
                                 Don't have an account?{" "}
                                 <Link
-                                    to="/register"
+                                    to="/"
                                     className="text-gray-300 hover:text-white underline underline-offset-2 ml-1 transition-colors"
                                 >
                                     Register
@@ -188,7 +188,7 @@ function Login() {
                     <span>Cosmos</span>
                 </div>
                 <div>
-                    curated by <span className="font-semibold text-gray-400">Mobbin</span>
+                     <span className="font-semibold text-gray-400"></span>
                 </div>
             </footer>
             

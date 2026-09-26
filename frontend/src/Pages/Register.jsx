@@ -177,7 +177,7 @@ function Register() {
                     <span>Cosmos</span>
                 </div>
                 <div>
-                    curated by <span className="font-semibold text-gray-400">Mobbin</span>
+                    copyright  <span className="font-semibold text-gray-400">@ 2026</span>
                 </div>
             </footer>
         </div>
