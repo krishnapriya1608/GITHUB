@@ -101,7 +101,7 @@ function Register() {
                 <div style={{ fontFamily: "Arima, system-ui" }} className="font-bold text-xl tracking-wider text-white">
                     COSMOS®
                 </div>
-                <nav className="flex items-center space-x-8 text-sm text-gray-300">
+                <nav style={{ fontFamily: "Arima, system-ui" }} className="flex items-center space-x-8 text-sm text-gray-300">
                     <Link to="/" className="hover:text-white transition-colors">Home</Link>
                     <a href="#features" className="hover:text-white transition-colors">Features</a>
                     <a href="#team" className="hover:text-white transition-colors">Team</a>
@@ -114,16 +114,17 @@ function Register() {
                     
                     {/* Left Column: Heading & Social Login */}
                     <div ref={leftColRef} className="lg:col-span-6 space-y-6">
-                        <h1 className="text-5xl font-black tracking-tight text-white uppercase">
+                        <h1 style={{ fontFamily: "Arima, system-ui" }} className="text-5xl font-black tracking-tight text-white uppercase">
                             REGISTER
                         </h1>
-                        <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
+                        <p style={{ fontFamily: "Arima, system-ui" }} className="text-gray-400 text-sm leading-relaxed max-w-sm">
                             Hey, welcome! <br />
                             Create your account to get started with us today.
                         </p>
 
                         <div className="pt-2">
                             <button
+                            style={{ fontFamily: "Arima, system-ui" }}
                                 type="button"
                                 className="flex items-center justify-center space-x-3 w-full sm:w-auto px-6 py-3 rounded-full border border-gray-700/80 bg-black/40 hover:bg-black/60 text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                             >
@@ -149,9 +150,9 @@ function Register() {
                             </button>
                         </div>
 
-                        <p className="text-gray-400 text-sm pt-4">
+                        <p style={{ fontFamily: "Arima, system-ui" }} className="text-gray-400 text-sm pt-4">
                             Already a member?{" "}
-                            <Link to="/login" className="font-bold text-white hover:underline ml-1">
+                            <Link style={{ fontFamily: "Arima, system-ui" }} to="/login" className="font-bold text-white hover:underline ml-1">
                                 Sign In
                             </Link>
                         </p>
@@ -163,7 +164,7 @@ function Register() {
                             ref={cardRef} 
                             className="w-full max-w-md p-8 rounded-3xl bg-[#282436]/40 backdrop-blur-xl border border-[#9181c4]/30 shadow-2xl space-y-5"
                         >
-                            <form onSubmit={handleRegister} className="space-y-4">
+                            <form style={{ fontFamily: "Arima, system-ui" }} onSubmit={handleRegister} className="space-y-4">
                                 {/* Name Input */}
                                 <div ref={(el) => (formFieldsRef.current[0] = el)} className="space-y-1.5">
                                     <label className="text-xs font-medium text-gray-300 tracking-wide">
