@@ -1,7 +1,10 @@
 const AdmZip = require('adm-zip')
 const Project = require('../Schema/projectSchema')
 const File = require('../Schema/fileSchema')
+const Chunk = require('../Schema/chunkSchema')
 const { classifyFile, isIgnoredPath } = require('../utils/fileClassifier')
+const chunkText = require('../utils/chunkText')
+const { embedTexts } = require('../utils/embedClient')
 
 const MAX_ENTRIES = 1000            // guard against zip bombs
 const MAX_FILE_CONTENT_BYTES = 200 * 1024 // truncate any single file's stored content at 200KB
@@ -97,10 +100,51 @@ exports.uploadProjectZip = async (req, res) => {
 
         const inserted = await File.insertMany(filesToInsert)
 
+        // ---------------- CHUNK + EMBED EACH FILE ----------------
+        // Best-effort: if the AI service is unreachable, the files are still
+        // saved above; we just skip embeddings for now rather than failing
+        // the whole upload. embeddingError (if present) tells the caller so.
+        let chunksStored = 0
+        let embeddingError = null
+
+        try {
+            const chunkDocs = []
+
+            for (const file of inserted) {
+                const pieces = chunkText(file.content)
+
+                pieces.forEach((text, index) => {
+                    chunkDocs.push({
+                        project: project._id,
+                        file: file._id,
+                        chunkIndex: index,
+                        text
+                    })
+                })
+            }
+
+            if (chunkDocs.length > 0) {
+                const vectors = await embedTexts(chunkDocs.map((c) => c.text))
+
+                chunkDocs.forEach((doc, i) => {
+                    doc.embedding = vectors[i]
+                })
+
+                const insertedChunks = await Chunk.insertMany(chunkDocs)
+                chunksStored = insertedChunks.length
+            }
+        }
+        catch (err) {
+            console.log("Embedding step failed:", err.message)
+            embeddingError = `Files were stored, but embedding generation failed: ${err.message}`
+        }
+
         res.status(201).json({
             message: "Zip processed successfully",
             filesStored: inserted.length,
             filesSkipped: skippedCount,
+            chunksStored,
+            embeddingError,
             files: inserted.map((f) => ({
                 _id: f._id,
                 filename: f.filename,
