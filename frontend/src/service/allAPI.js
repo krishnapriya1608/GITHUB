@@ -40,8 +40,8 @@ export const getMyProjectsAPI = async () => {
     return await commonAPI('GET', `${serverURL}/api/projects`, {}, authHeader())
 }
 
-export const getProjectByIdAPI = async (id) => {
-    return await commonAPI('GET', `${serverURL}/api/projects/${id}`, {}, authHeader())
+export const getProjectByIdAPI = async (projectId) => {
+    return await commonAPI('GET', `${serverURL}/api/projects/${projectId}`, {}, authHeader())
 }
 
 export const updateProjectAPI = async (id, data) => {
