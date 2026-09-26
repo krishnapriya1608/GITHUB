@@ -19,7 +19,7 @@ app.get('/', (req, res) => {
 
 app.use('/api', router)
 app.use('/api/projects', projectRouter)
-app.use('/api/file', projectRouter)
+app.use('/api/projects/:projectId/files', projectRouter)
 app.use((err, req, res, next) => {
     if (err && err.name === 'MulterError') {
         return res.status(400).json({ message: err.message })
