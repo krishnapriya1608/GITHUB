@@ -3,9 +3,9 @@ const Project = require('../Schema/projectSchema')
 const File = require('../Schema/fileSchema')
 const Chunk = require('../Schema/chunkSchema')
 const { classifyFile, isIgnoredPath } = require('../utils/fileClassifier')
-const chunkText = require('../utils/chunkText')
+const chunkCode = require('../utils/chunkCode')
 const { embedTexts } = require('../utils/embedClient')
-const { indexChunks, searchChunks, deleteFileVectors } = require('../utils/vectorClient')
+const { indexChunks, searchChunks, askQuestion, deleteFileVectors } = require('../utils/vectorClient')
 
 const MAX_ENTRIES = 2000            // guard against zip bombs — counts relevant files only, after filtering
 const MAX_FILE_CONTENT_BYTES = 200 * 1024 // truncate any single file's stored content at 200KB
@@ -116,14 +116,16 @@ exports.uploadProjectZip = async (req, res) => {
             const chunkDocs = []
 
             for (const file of inserted) {
-                const pieces = chunkText(file.content)
+                const pieces = chunkCode(file.content)
 
-                pieces.forEach((text, index) => {
+                pieces.forEach((piece, index) => {
                     chunkDocs.push({
                         project: project._id,
                         file: file._id,
                         chunkIndex: index,
-                        text
+                        startLine: piece.startLine,
+                        endLine: piece.endLine,
+                        text: piece.text
                     })
                 })
             }
@@ -153,7 +155,9 @@ exports.uploadProjectZip = async (req, res) => {
                                 file_id: c.file.toString(),
                                 filename: file.filename,
                                 path: file.path || "",
-                                chunk_index: c.chunkIndex
+                                chunk_index: c.chunkIndex,
+                                start_line: c.startLine,
+                                end_line: c.endLine
                             }
                         })
                     )
@@ -298,5 +302,35 @@ exports.searchProject = async (req, res) => {
     catch (err) {
         console.log(err.message)
         return res.status(500).json({ message: "Search failed: " + err.message })
+    }
+}
+
+// ---------------- ASK A QUESTION (RAG ANSWER WITH CITATIONS) ----------------
+exports.askProject = async (req, res) => {
+    console.log("Inside ask project")
+    try {
+        const { projectId } = req.params
+        const { question, topK } = req.body
+
+        if (!question || !question.trim()) {
+            return res.status(400).json({ message: "Question is required" })
+        }
+        if (question.length > 2000) {
+            return res.status(400).json({ message: "Question is too long (max 2000 characters)" })
+        }
+
+        const project = await findOwnedProject(projectId, req.user.id)
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" })
+        }
+
+        const limit = Math.min(Math.max(parseInt(topK) || 6, 1), 12)
+        const data = await askQuestion(projectId, question.trim(), limit)
+
+        res.status(200).json({ message: "Answer generated", answer: data.answer, sources: data.sources })
+    }
+    catch (err) {
+        console.log(err.message)
+        return res.status(500).json({ message: "Could not generate answer: " + err.message })
     }
 }

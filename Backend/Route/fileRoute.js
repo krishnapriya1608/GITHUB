@@ -9,6 +9,7 @@ router.use(authMiddleware)
 
 router.post('/upload', uploadZip.single('zipfile'), fileController.uploadProjectZip)
 router.post('/search', fileController.searchProject)
+router.post('/ask', fileController.askProject)
 router.get('/', fileController.getProjectFiles)
 router.get('/:fileId', fileController.getFileById)
 router.delete('/:fileId', fileController.deleteFile)

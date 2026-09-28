@@ -32,6 +32,11 @@ const searchChunks = async (projectId, query, topK = 5) => {
     return data.results
 }
 
+// Retrieval + LLM answer with citations, all done inside the Python service
+const askQuestion = async (projectId, question, topK = 6) => {
+    return post('/ask', { project_id: projectId, question, top_k: topK })
+}
+
 const deleteFileVectors = async (fileId) => {
     const response = await fetch(`${AI_SERVICE_URL}/files/${fileId}`, { method: 'DELETE' })
     if (!response.ok) {
@@ -39,4 +44,4 @@ const deleteFileVectors = async (fileId) => {
     }
 }
 
-module.exports = { indexChunks, searchChunks, deleteFileVectors }
+module.exports = { indexChunks, searchChunks, askQuestion, deleteFileVectors }
