@@ -3,9 +3,8 @@ const Project = require('../Schema/projectSchema')
 const File = require('../Schema/fileSchema')
 const Chunk = require('../Schema/chunkSchema')
 const { classifyFile, isIgnoredPath } = require('../utils/fileClassifier')
-const chunkCode = require('../utils/chunkCode')
-const { embedTexts } = require('../utils/embedClient')
-const { indexChunks, searchChunks, askQuestion, deleteFileVectors } = require('../utils/vectorClient')
+const { startIndexJob, getJob, isRunning } = require('../utils/indexJobs')
+const { searchChunks, askQuestion, deleteFileVectors, deleteProjectVectors } = require('../utils/vectorClient')
 
 const MAX_ENTRIES = 2000            // guard against zip bombs — counts relevant files only, after filtering
 const MAX_FILE_CONTENT_BYTES = 200 * 1024 // truncate any single file's stored content at 200KB
@@ -106,88 +105,15 @@ exports.uploadProjectZip = async (req, res) => {
 
         const inserted = await File.insertMany(filesToInsert)
 
-        // ---------------- CHUNK + EMBED + INDEX ----------------
-        // Best-effort: if the AI service is unreachable, the files are still
-        // saved above; embeddingError tells the caller what didn't happen.
-        let chunksStored = 0
-        let embeddingError = null
-
-        try {
-            const chunkDocs = []
-            const embedInputs = [] // what the model reads: file path + chunk text
-
-            for (const file of inserted) {
-                const pieces = chunkCode(file.content)
-
-                pieces.forEach((piece, index) => {
-                    chunkDocs.push({
-                        project: project._id,
-                        file: file._id,
-                        chunkIndex: index,
-                        startLine: piece.startLine,
-                        endLine: piece.endLine,
-                        text: piece.text
-                    })
-
-                    // Give the embedding the file's identity so "login" can match Login.jsx / loginController.js
-                    embedInputs.push(`File: ${file.path ? file.path + '/' : ''}${file.filename}\n${piece.text}`)
-                })
-            }
-
-            if (chunkDocs.length > 0) {
-                const vectors = await embedTexts(embedInputs)
-
-                chunkDocs.forEach((doc, i) => {
-                    doc.embedding = vectors[i]
-                })
-
-                console.log(`Created ${chunkDocs.length} chunks from ${inserted.length} files`)
-                const insertedChunks = await Chunk.insertMany(chunkDocs)
-                chunksStored = insertedChunks.length
-
-                // Push the same vectors into ChromaDB for similarity search
-                const fileById = new Map(inserted.map((f) => [f._id.toString(), f]))
-
-                const indexStarted = Date.now()
-                try {
-                    await indexChunks(
-                        insertedChunks.map((c) => {
-                            const file = fileById.get(c.file.toString())
-                            return {
-                                id: c._id.toString(),
-                                text: c.text,
-                                embedding: c.embedding,
-                                project_id: project._id.toString(),
-                                file_id: c.file.toString(),
-                                filename: file.filename,
-                                path: file.path || "",
-                                chunk_index: c.chunkIndex,
-                                start_line: c.startLine,
-                                end_line: c.endLine
-                            }
-                        })
-                    )
-                }
-                catch (err) {
-                    console.log("Vector indexing failed:", err.message)
-                    embeddingError = `Chunks were saved, but vector indexing failed: ${err.message}`
-                }
-                finally {
-                    console.log(`Indexing took ${((Date.now() - indexStarted) / 1000).toFixed(1)}s`)
-                }
-            }
-        }
-        catch (err) {
-            console.log("Embedding step failed:", err.message)
-            embeddingError = `Files were stored, but embedding generation failed: ${err.message}`
-        }
+        // Files are saved. Chunking/embedding/indexing runs in the background so the
+        // upload returns immediately; the frontend polls /index-status for progress.
+        startIndexJob(project._id, inserted)
 
         res.status(201).json({
             message: "Zip processed successfully",
             filesStored: inserted.length,
             filesSkipped: skippedCount,
-            chunksStored,
-            embeddingError,
+            indexing: true,
             files: inserted.map((f) => ({
                 _id: f._id,
                 filename: f.filename,
@@ -341,5 +267,66 @@ exports.askProject = async (req, res) => {
     catch (err) {
         console.log(err.message)
         return res.status(500).json({ message: "Could not generate answer: " + err.message })
+    }
+}
+
+// ---------------- REBUILD THE INDEX FOR A PROJECT ----------------
+// Re-chunks and re-embeds the files already stored, without re-uploading the zip.
+// Use it after an embedding failure or after changing chunk settings.
+exports.reindexProject = async (req, res) => {
+    console.log("Inside reindex project")
+    try {
+        const { projectId } = req.params
+
+        const project = await findOwnedProject(projectId, req.user.id)
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" })
+        }
+
+        const files = await File.find({ project: projectId })
+        if (files.length === 0) {
+            return res.status(400).json({ message: "This project has no files to index" })
+        }
+
+        if (isRunning(projectId)) {
+            return res.status(409).json({ message: "Indexing is already in progress for this project" })
+        }
+
+        await Chunk.deleteMany({ project: projectId })
+        try {
+            await deleteProjectVectors(projectId)
+        } catch (err) {
+            console.log("Could not clear old vectors:", err.message)
+        }
+
+        startIndexJob(project._id, files)
+
+        res.status(202).json({
+            message: "Rebuilding index in the background",
+            filesIndexed: files.length,
+            indexing: true
+        })
+    }
+    catch (err) {
+        console.log(err.message)
+        return res.status(500).json({ message: "Internal server error" })
+    }
+}
+
+// ---------------- INDEXING PROGRESS ----------------
+exports.getIndexStatus = async (req, res) => {
+    try {
+        const { projectId } = req.params
+
+        const project = await findOwnedProject(projectId, req.user.id)
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" })
+        }
+
+        res.status(200).json(getJob(projectId))
+    }
+    catch (err) {
+        console.log(err.message)
+        return res.status(500).json({ message: "Internal server error" })
     }
 }

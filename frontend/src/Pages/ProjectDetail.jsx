@@ -7,7 +7,9 @@ import {
     getFileByIdAPI,
     deleteFileAPI,
     searchProjectAPI,
-    askProjectAPI
+    askProjectAPI,
+    reindexProjectAPI,
+    getIndexStatusAPI
 } from '../service/allAPI'
 
 function ProjectDetail() {
@@ -27,6 +29,8 @@ function ProjectDetail() {
     const [question, setQuestion] = useState("")
     const [answer, setAnswer] = useState(null)
     const [asking, setAsking] = useState(false)
+    const [reindexing, setReindexing] = useState(false)
+    const [indexStatus, setIndexStatus] = useState(null)
     const [askError, setAskError] = useState(null)
     const [highlight, setHighlight] = useState(null)
     const highlightRef = useRef(null)
@@ -46,6 +50,32 @@ function ProjectDetail() {
             highlightRef.current.scrollIntoView({ block: "center" })
         }
     }, [selectedFile, highlight])
+
+    const fetchIndexStatus = async () => {
+        try {
+            const res = await getIndexStatusAPI(id)
+            if (res.status === 200) {
+                setIndexStatus((prev) => {
+                    // don't resurrect a status card the user dismissed
+                    if (!prev && res.data.state !== "indexing") return prev
+                    return res.data
+                })
+            }
+        }
+        catch (err) {
+            console.log(err.message)
+        }
+    }
+
+    useEffect(() => {
+        fetchIndexStatus()
+    }, [id])
+
+    useEffect(() => {
+        if (indexStatus?.state !== "indexing") return
+        const timer = setInterval(fetchIndexStatus, 2000)
+        return () => clearInterval(timer)
+    }, [indexStatus?.state, id])
 
     const loadProject = async () => {
         try {
@@ -102,10 +132,9 @@ function ProjectDetail() {
                 setUploadStatus({
                     ok: true,
                     filesStored: res.data.filesStored,
-                    filesSkipped: res.data.filesSkipped,
-                    chunksStored: res.data.chunksStored,
-                    embeddingError: res.data.embeddingError
+                    filesSkipped: res.data.filesSkipped
                 })
+                setIndexStatus({ state: "indexing", done: 0, total: 0 })
                 loadFiles()
             } else {
                 setUploadStatus({ ok: false, message: res.data?.message || "Upload failed" })
@@ -117,6 +146,27 @@ function ProjectDetail() {
         }
         finally {
             setUploading(false)
+        }
+    }
+
+    const handleReindex = async () => {
+        setReindexing(true)
+        setUploadStatus(null)
+        try {
+            const res = await reindexProjectAPI(id)
+            if (res.status === 202) {
+                setUploadStatus({ ok: true, kind: "reindex", filesStored: res.data.filesIndexed })
+                setIndexStatus({ state: "indexing", done: 0, total: 0 })
+            } else {
+                setUploadStatus({ ok: false, message: res.data?.message || "Could not rebuild the index" })
+            }
+        }
+        catch (err) {
+            console.log(err.message)
+            setUploadStatus({ ok: false, message: "Something went wrong while rebuilding the index." })
+        }
+        finally {
+            setReindexing(false)
         }
     }
 
@@ -247,7 +297,18 @@ function ProjectDetail() {
                             )}
                         </div>
 
-                        <div>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={handleReindex}
+                                disabled={reindexing || uploading || indexStatus?.state === "indexing" || files.length === 0}
+                                title="Re-chunk and re-embed the stored files without re-uploading"
+                                className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium
+                                           text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed
+                                           disabled:opacity-50 transition-colors"
+                            >
+                                {reindexing ? "Rebuilding…" : "Rebuild index"}
+                            </button>
                             <button
                                 type="button"
                                 onClick={handleUploadClick}
@@ -284,8 +345,12 @@ function ProjectDetail() {
                             {uploadStatus.ok ? (
                                 <>
                                     <p>
-                                        Stored <span className="font-medium">{uploadStatus.filesStored}</span> file(s),
-                                        skipped {uploadStatus.filesSkipped}.
+                                        {uploadStatus.kind === "reindex" ? (
+                                            <>Re-indexed <span className="font-medium">{uploadStatus.filesStored}</span> file(s).</>
+                                        ) : (
+                                            <>Stored <span className="font-medium">{uploadStatus.filesStored}</span> file(s),
+                                            skipped {uploadStatus.filesSkipped}.</>
+                                        )}
                                         {uploadStatus.chunksStored > 0 && (
                                             <> Generated <span className="font-medium">{uploadStatus.chunksStored}</span> embedded chunk(s).</>
                                         )}
@@ -307,6 +372,69 @@ function ProjectDetail() {
                         >
                             Dismiss
                         </button>
+                    </div>
+                )}
+
+                {/* Background indexing progress */}
+                {indexStatus && indexStatus.state !== "idle" && (
+                    <div
+                        className={`mb-6 rounded-md border px-4 py-3 text-sm ${
+                            indexStatus.state === "error"
+                                ? "border-red-200 bg-red-50 text-red-900"
+                                : indexStatus.state === "done"
+                                ? "border-teal-200 bg-teal-50 text-teal-900"
+                                : "border-neutral-200 bg-white text-neutral-700"
+                        }`}
+                    >
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                                {indexStatus.state === "indexing" && (
+                                    <>
+                                        <p>
+                                            Indexing for search…{" "}
+                                            <span className="font-medium">
+                                                {indexStatus.total > 0
+                                                    ? `${indexStatus.done} / ${indexStatus.total} chunks`
+                                                    : "preparing"}
+                                            </span>
+                                        </p>
+                                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-neutral-200">
+                                            <div
+                                                className="h-full bg-teal-600 transition-all duration-500"
+                                                style={{
+                                                    width: `${indexStatus.total > 0 ? Math.round((indexStatus.done / indexStatus.total) * 100) : 3}%`
+                                                }}
+                                            />
+                                        </div>
+                                        <p className="mt-2 text-xs text-neutral-400">
+                                            Your files are already saved. You can browse them while this runs;
+                                            Search and Ask get better as more chunks are indexed.
+                                        </p>
+                                    </>
+                                )}
+                                {indexStatus.state === "done" && (
+                                    <p>Indexed {indexStatus.chunksStored} chunks. Search and Ask are ready.</p>
+                                )}
+                                {indexStatus.state === "error" && (
+                                    <>
+                                        <p className="font-medium">Indexing stopped.</p>
+                                        <p className="mt-1">{indexStatus.error}</p>
+                                        <p className="mt-1 text-xs">
+                                            Fix the cause, then click Rebuild index. Your files are safe.
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                            {indexStatus.state !== "indexing" && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIndexStatus(null)}
+                                    className="shrink-0 rounded border border-current px-2 py-1 text-xs hover:opacity-70"
+                                >
+                                    Dismiss
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
 
