@@ -70,3 +70,7 @@ export const getFileByIdAPI = async (projectId, fileId) => {
 export const deleteFileAPI = async (projectId, fileId) => {
     return await commonAPI('DELETE', `${serverURL}/api/${projectId}/files/${fileId}`, {}, authHeader())
 }
+
+export const searchProjectAPI = async (projectId, body) => {
+    return await commonAPI('POST', `${serverURL}/api/${projectId}/files/search`, body, authHeader())
+}

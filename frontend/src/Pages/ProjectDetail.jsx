@@ -5,7 +5,8 @@ import {
     uploadProjectZipAPI,
     getProjectFilesAPI,
     getFileByIdAPI,
-    deleteFileAPI
+    deleteFileAPI,
+    searchProjectAPI
 } from '../service/allAPI'
 
 function ProjectDetail() {
@@ -19,6 +20,9 @@ function ProjectDetail() {
     const [uploading, setUploading] = useState(false)
     const [loading, setLoading] = useState(true)
     const [uploadStatus, setUploadStatus] = useState(null)
+    const [searchQuery, setSearchQuery] = useState("")
+    const [searchResults, setSearchResults] = useState(null)
+    const [searching, setSearching] = useState(false)
 
     useEffect(() => {
         const token = localStorage.getItem("token")
@@ -133,6 +137,27 @@ function ProjectDetail() {
         }
     }
 
+    const handleSearch = async (e) => {
+        e.preventDefault()
+        if (!searchQuery.trim()) return
+
+        setSearching(true)
+        try {
+            const res = await searchProjectAPI(id, { query: searchQuery, topK: 5 })
+            if (res.status === 200) {
+                setSearchResults(res.data.results)
+            } else {
+                alert(res.data?.message || "Search failed")
+            }
+        }
+        catch (err) {
+            console.log(err.message)
+        }
+        finally {
+            setSearching(false)
+        }
+    }
+
     const formatBytes = (bytes) => {
         if (bytes < 1024) return `${bytes} B`
         return `${(bytes / 1024).toFixed(1)} KB`
@@ -222,6 +247,76 @@ function ProjectDetail() {
                         </button>
                     </div>
                 )}
+
+                {/* Semantic search */}
+                <div className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
+                    <form onSubmit={handleSearch} className="flex gap-2">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search this project by meaning, e.g. &quot;how does login work?&quot;"
+                            className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm
+                                       focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                        />
+                        <button
+                            type="submit"
+                            disabled={searching}
+                            className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white
+                                       hover:bg-teal-800 disabled:opacity-60 transition-colors"
+                        >
+                            {searching ? "Searching…" : "Search"}
+                        </button>
+                    </form>
+
+                    {searchResults && (
+                        <div className="mt-4">
+                            <div className="mb-2 flex items-center justify-between">
+                                <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+                                    {searchResults.length} result(s)
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchResults(null)}
+                                    className="text-xs text-neutral-400 hover:text-neutral-700"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+
+                            {searchResults.length === 0 ? (
+                                <p className="text-sm text-neutral-400">
+                                    No matches. Has this project been uploaded since indexing was added?
+                                </p>
+                            ) : (
+                                <ul className="space-y-2">
+                                    {searchResults.map((r) => (
+                                        <li key={r.chunk_id}>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewFile(r.file_id)}
+                                                className="w-full rounded-md border border-neutral-200 p-3 text-left hover:border-teal-400 hover:bg-teal-50/40 transition-colors"
+                                            >
+                                                <div className="mb-1 flex items-center justify-between gap-2">
+                                                    <span className="truncate font-mono text-xs text-neutral-700">
+                                                        {r.path && <span className="text-neutral-400">{r.path}/</span>}
+                                                        {r.filename}
+                                                    </span>
+                                                    <span className="shrink-0 rounded bg-teal-100 px-1.5 py-0.5 font-mono text-[10px] font-medium text-teal-800">
+                                                        {(r.score * 100).toFixed(0)}% match
+                                                    </span>
+                                                </div>
+                                                <pre className="max-h-24 overflow-hidden whitespace-pre-wrap font-mono text-xs text-neutral-500">
+                                                    {r.text}
+                                                </pre>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
+                </div>
 
                 {/* File browser: explorer-style sidebar + editor-style preview */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-[280px_1fr]">
