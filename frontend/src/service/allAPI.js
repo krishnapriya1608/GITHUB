@@ -71,6 +71,12 @@ export const deleteFileAPI = async (projectId, fileId) => {
     return await commonAPI('DELETE', `${serverURL}/api/${projectId}/files/${fileId}`, {}, authHeader())
 }
 
+// Add both of these to the bottom of frontend/src/service/allAPI.js
 export const searchProjectAPI = async (projectId, body) => {
     return await commonAPI('POST', `${serverURL}/api/${projectId}/files/search`, body, authHeader())
 }
+
+export const askProjectAPI = async (projectId, body) => {
+    return await commonAPI('POST', `${serverURL}/api/${projectId}/files/ask`, body, authHeader())
+}
+

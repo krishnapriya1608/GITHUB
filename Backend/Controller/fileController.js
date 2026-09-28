@@ -114,6 +114,7 @@ exports.uploadProjectZip = async (req, res) => {
 
         try {
             const chunkDocs = []
+            const embedInputs = [] // what the model reads: file path + chunk text
 
             for (const file of inserted) {
                 const pieces = chunkCode(file.content)
@@ -127,22 +128,27 @@ exports.uploadProjectZip = async (req, res) => {
                         endLine: piece.endLine,
                         text: piece.text
                     })
+
+                    // Give the embedding the file's identity so "login" can match Login.jsx / loginController.js
+                    embedInputs.push(`File: ${file.path ? file.path + '/' : ''}${file.filename}\n${piece.text}`)
                 })
             }
 
             if (chunkDocs.length > 0) {
-                const vectors = await embedTexts(chunkDocs.map((c) => c.text))
+                const vectors = await embedTexts(embedInputs)
 
                 chunkDocs.forEach((doc, i) => {
                     doc.embedding = vectors[i]
                 })
 
+                console.log(`Created ${chunkDocs.length} chunks from ${inserted.length} files`)
                 const insertedChunks = await Chunk.insertMany(chunkDocs)
                 chunksStored = insertedChunks.length
 
                 // Push the same vectors into ChromaDB for similarity search
                 const fileById = new Map(inserted.map((f) => [f._id.toString(), f]))
 
+                const indexStarted = Date.now()
                 try {
                     await indexChunks(
                         insertedChunks.map((c) => {
@@ -165,6 +171,9 @@ exports.uploadProjectZip = async (req, res) => {
                 catch (err) {
                     console.log("Vector indexing failed:", err.message)
                     embeddingError = `Chunks were saved, but vector indexing failed: ${err.message}`
+                }
+                finally {
+                    console.log(`Indexing took ${((Date.now() - indexStarted) / 1000).toFixed(1)}s`)
                 }
             }
         }

@@ -1,12 +1,27 @@
-from fastapi import FastAPI, UploadFile, File
+from dotenv import load_dotenv
+
+load_dotenv()  # reads Python-aiservice/.env (ANTHROPIC_API_KEY, ANSWER_MODEL)
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from typing import List
 
 from file_processor import process_file
-from embeddings import embed_texts
+from embeddings import embed_texts, get_model
 import vectorstore
+import rag
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app):
+    # Load the embedding model once at startup so the first search isn't slow
+    print("Loading embedding model...")
+    get_model()
+    print("Embedding model ready.")
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/")
@@ -59,6 +74,8 @@ class ChunkIn(BaseModel):
     filename: str
     path: str = ""
     chunk_index: int
+    start_line: int = 1
+    end_line: int = 1
 
 
 class IndexRequest(BaseModel):
@@ -95,3 +112,33 @@ async def delete_file_vectors(file_id: str):
 async def delete_project_vectors(project_id: str):
     vectorstore.delete_project(project_id)
     return {"message": "Project vectors deleted"}
+
+
+# ---------------- RAG: ASK A QUESTION ----------------
+class AskRequest(BaseModel):
+    project_id: str
+    question: str
+    top_k: int = 6
+
+
+@app.post("/ask")
+async def ask(payload: AskRequest):
+    """Retrieve the most relevant chunks, then have Claude answer with citations."""
+    results = vectorstore.search(payload.project_id, payload.question, payload.top_k)
+
+    try:
+        answer = rag.answer_question(payload.question, results)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Answer generation failed: {e}")
+
+    # numbered to match the [1], [2] markers the model was told to cite
+    sources = [{"number": i, **r} for i, r in enumerate(results, start=1)]
+
+    return {"answer": answer, "sources": sources}
+
+
+# ---------------- DIAGNOSTICS ----------------
+@app.get("/stats")
+async def stats(project_id: str = None):
+    """Open http://localhost:8000/stats?project_id=<id> to see what is indexed."""
+    return vectorstore.stats(project_id)

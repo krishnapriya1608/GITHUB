@@ -4,8 +4,8 @@
 // has no natural boundary it is hard-split at MAX_CHARS with a few lines of
 // overlap. Each chunk remembers its 1-based line range so answers can cite it.
 
-const TARGET_CHARS = 1200   // start looking for a boundary after this much text
-const MAX_CHARS = 2000      // never let a chunk grow past this
+const TARGET_CHARS = 600   // start looking for a boundary after this much text
+const MAX_CHARS = 1100      // never let a chunk grow past this
 const OVERLAP_LINES = 3     // lines repeated after a hard split
 
 // Lines that usually start a new logical block (JS/TS, Python, Java, Markdown)

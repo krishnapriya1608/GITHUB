@@ -3,3 +3,5 @@ uvicorn
 python-multipart
 sentence-transformers
 chromadb
+requests
+python-dotenv

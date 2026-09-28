@@ -21,6 +21,9 @@ def get_model() -> SentenceTransformer:
     global _model
     if _model is None:
         _model = SentenceTransformer("all-MiniLM-L6-v2")
+        # Default is 256 tokens, which silently cuts off most of a code chunk.
+        # The model supports up to 512, so let it read the whole chunk.
+        _model.max_seq_length = 512
     return _model
 
 

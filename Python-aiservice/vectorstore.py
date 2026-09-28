@@ -43,6 +43,8 @@ def upsert_chunks(chunks: List[Dict[str, Any]]) -> int:
                     "filename": c["filename"],
                     "path": c.get("path", ""),
                     "chunk_index": c["chunk_index"],
+                    "start_line": c.get("start_line", 1),
+                    "end_line": c.get("end_line", 1),
                 }
                 for c in batch
             ],
@@ -74,6 +76,8 @@ def search(project_id: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
             "filename": metas[i]["filename"],
             "path": metas[i]["path"],
             "chunk_index": metas[i]["chunk_index"],
+            "start_line": metas[i].get("start_line", 1),
+            "end_line": metas[i].get("end_line", 1),
             "score": round(1 - distances[i], 4),  # cosine distance -> similarity (higher = closer)
         }
         for i in range(len(ids))
@@ -86,3 +90,13 @@ def delete_file(file_id: str) -> None:
 
 def delete_project(project_id: str) -> None:
     _collection.delete(where={"project_id": project_id})
+
+
+def stats(project_id: str = None) -> Dict[str, Any]:
+    """How many vectors are stored, overall and (optionally) for one project."""
+    out = {"total_vectors": _collection.count()}
+    if project_id:
+        found = _collection.get(where={"project_id": project_id}, include=[])
+        out["project_id"] = project_id
+        out["project_vectors"] = len(found["ids"])
+    return out

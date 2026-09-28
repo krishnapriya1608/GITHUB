@@ -6,7 +6,8 @@ import {
     getProjectFilesAPI,
     getFileByIdAPI,
     deleteFileAPI,
-    searchProjectAPI
+    searchProjectAPI,
+    askProjectAPI
 } from '../service/allAPI'
 
 function ProjectDetail() {
@@ -23,6 +24,12 @@ function ProjectDetail() {
     const [searchQuery, setSearchQuery] = useState("")
     const [searchResults, setSearchResults] = useState(null)
     const [searching, setSearching] = useState(false)
+    const [question, setQuestion] = useState("")
+    const [answer, setAnswer] = useState(null)
+    const [asking, setAsking] = useState(false)
+    const [askError, setAskError] = useState(null)
+    const [highlight, setHighlight] = useState(null)
+    const highlightRef = useRef(null)
 
     useEffect(() => {
         const token = localStorage.getItem("token")
@@ -33,6 +40,12 @@ function ProjectDetail() {
         loadProject()
         loadFiles()
     }, [id])
+
+    useEffect(() => {
+        if (highlight && highlightRef.current) {
+            highlightRef.current.scrollIntoView({ block: "center" })
+        }
+    }, [selectedFile, highlight])
 
     const loadProject = async () => {
         try {
@@ -107,10 +120,11 @@ function ProjectDetail() {
         }
     }
 
-    const handleViewFile = async (fileId) => {
+    const handleViewFile = async (fileId, startLine, endLine) => {
         try {
             const res = await getFileByIdAPI(id, fileId)
             if (res.status === 200) {
+                setHighlight(startLine ? { start: startLine, end: endLine || startLine } : null)
                 setSelectedFile(res.data.file)
             } else {
                 alert(res.data?.message || "Could not load file")
@@ -156,6 +170,54 @@ function ProjectDetail() {
         finally {
             setSearching(false)
         }
+    }
+
+    const handleAsk = async (e) => {
+        e.preventDefault()
+        if (!question.trim()) return
+
+        setAsking(true)
+        setAskError(null)
+        setAnswer(null)
+        try {
+            const res = await askProjectAPI(id, { question, topK: 6 })
+            if (res.status === 200) {
+                setAnswer({ text: res.data.answer, sources: res.data.sources })
+            } else {
+                setAskError(res.data?.message || "Could not generate an answer")
+            }
+        }
+        catch (err) {
+            console.log(err.message)
+            setAskError("Something went wrong while asking.")
+        }
+        finally {
+            setAsking(false)
+        }
+    }
+
+    const openSource = (source) => {
+        handleViewFile(source.file_id, source.start_line, source.end_line)
+    }
+
+    // Turn "[1]" markers in the answer into clickable citation chips
+    const renderAnswer = (text, sources) => {
+        return text.split(/(\[\d+\])/g).map((part, i) => {
+            const match = part.match(/^\[(\d+)\]$/)
+            const source = match && sources.find((s) => s.number === Number(match[1]))
+            if (!source) return <span key={i}>{part}</span>
+            return (
+                <button
+                    key={i}
+                    type="button"
+                    onClick={() => openSource(source)}
+                    title={`${source.filename} lines ${source.start_line}-${source.end_line}`}
+                    className="mx-0.5 rounded bg-teal-100 px-1 font-mono text-[11px] font-medium text-teal-800 hover:bg-teal-200"
+                >
+                    {match[1]}
+                </button>
+            )
+        })
     }
 
     const formatBytes = (bytes) => {
@@ -248,6 +310,72 @@ function ProjectDetail() {
                     </div>
                 )}
 
+                {/* Ask the codebase */}
+                <div className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
+                    <form onSubmit={handleAsk} className="flex gap-2">
+                        <input
+                            type="text"
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                            placeholder="Ask about this codebase, e.g. &quot;how does authentication work?&quot;"
+                            className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm
+                                       focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                        />
+                        <button
+                            type="submit"
+                            disabled={asking}
+                            className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white
+                                       hover:bg-teal-800 disabled:opacity-60 transition-colors"
+                        >
+                            {asking ? "Thinking…" : "Ask"}
+                        </button>
+                    </form>
+
+                    {askError && (
+                        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                            {askError}
+                        </p>
+                    )}
+
+                    {answer && (
+                        <div className="mt-4">
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-800">
+                                {renderAnswer(answer.text, answer.sources)}
+                            </p>
+
+                            {answer.sources.length > 0 && (
+                                <div className="mt-4 border-t border-neutral-100 pt-3">
+                                    <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+                                        Sources
+                                    </span>
+                                    <ul className="mt-2 space-y-1">
+                                        {answer.sources.map((src) => (
+                                            <li key={src.chunk_id}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openSource(src)}
+                                                    className="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-neutral-50"
+                                                >
+                                                    <span className="shrink-0 rounded bg-teal-100 px-1.5 font-mono text-[11px] font-medium text-teal-800">
+                                                        {src.number}
+                                                    </span>
+                                                    <span className="truncate font-mono text-xs text-neutral-700">
+                                                        {src.path && <span className="text-neutral-400">{src.path}/</span>}
+                                                        {src.filename}
+                                                    </span>
+                                                    <span className="shrink-0 text-xs text-neutral-400">
+                                                        lines {src.start_line}–{src.end_line}
+                                                    </span>
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {/* Semantic search */}
                 <div className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
                     <form onSubmit={handleSearch} className="flex gap-2">
@@ -294,7 +422,7 @@ function ProjectDetail() {
                                         <li key={r.chunk_id}>
                                             <button
                                                 type="button"
-                                                onClick={() => handleViewFile(r.file_id)}
+                                                onClick={() => handleViewFile(r.file_id, r.start_line, r.end_line)}
                                                 className="w-full rounded-md border border-neutral-200 p-3 text-left hover:border-teal-400 hover:bg-teal-50/40 transition-colors"
                                             >
                                                 <div className="mb-1 flex items-center justify-between gap-2">
@@ -306,7 +434,7 @@ function ProjectDetail() {
                                                         {(r.score * 100).toFixed(0)}% match
                                                     </span>
                                                 </div>
-                                                <pre className="max-h-24 overflow-hidden whitespace-pre-wrap font-mono text-xs text-neutral-500">
+                                                <pre className="max-h-40 overflow-auto whitespace-pre-wrap font-mono text-xs text-neutral-500">
                                                     {r.text}
                                                 </pre>
                                             </button>
@@ -399,9 +527,24 @@ function ProjectDetail() {
                                         </span>
                                     )}
                                 </div>
-                                <pre className="max-h-[70vh] overflow-auto px-4 py-4 font-mono text-xs leading-relaxed text-neutral-200">
-                                    {selectedFile.content}
-                                </pre>
+                                <div className="max-h-[70vh] overflow-auto py-3 font-mono text-xs leading-relaxed text-neutral-200">
+                                    {selectedFile.content.split("\n").map((line, i) => {
+                                        const n = i + 1
+                                        const inRange = highlight && n >= highlight.start && n <= highlight.end
+                                        return (
+                                            <div
+                                                key={n}
+                                                ref={highlight && n === highlight.start ? highlightRef : null}
+                                                className={`flex ${inRange ? "bg-teal-400/15" : ""}`}
+                                            >
+                                                <span className="w-12 shrink-0 select-none pr-3 text-right text-neutral-600">
+                                                    {n}
+                                                </span>
+                                                <span className="whitespace-pre pr-4">{line}</span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
                             </>
                         ) : (
                             <div className="flex h-full min-h-[300px] items-center justify-center px-4 text-sm text-neutral-500">
