@@ -1,8 +1,8 @@
 const multer = require('multer')
 
-const MAX_ZIP_SIZE = 25 * 1024 * 1024 // 25 MB
+const MAX_ZIP_SIZE = 100 * 1024 * 1024 // 100 MB
 
-const storage = multer.memoryStorage() // never touches disk
+const storage = multer.memoryStorage() 
 
 const fileFilter = (req, file, cb) => {
     const isZip =

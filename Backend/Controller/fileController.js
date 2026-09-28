@@ -5,8 +5,9 @@ const Chunk = require('../Schema/chunkSchema')
 const { classifyFile, isIgnoredPath } = require('../utils/fileClassifier')
 const chunkText = require('../utils/chunkText')
 const { embedTexts } = require('../utils/embedClient')
+const { indexChunks, searchChunks, deleteFileVectors } = require('../utils/vectorClient')
 
-const MAX_ENTRIES = 1000            // guard against zip bombs
+const MAX_ENTRIES = 2000            // guard against zip bombs — counts relevant files only, after filtering
 const MAX_FILE_CONTENT_BYTES = 200 * 1024 // truncate any single file's stored content at 200KB
 
 // A project only belongs to the logged-in user if owner matches
@@ -37,12 +38,10 @@ exports.uploadProjectZip = async (req, res) => {
         }
 
         const entries = zip.getEntries()
-        if (entries.length > MAX_ENTRIES) {
-            return res.status(400).json({ message: `Zip has too many entries (max ${MAX_ENTRIES})` })
-        }
 
         const filesToInsert = []
         let skippedCount = 0
+        let relevantCount = 0
 
         for (const entry of entries) {
             if (entry.isDirectory) continue
@@ -57,6 +56,13 @@ exports.uploadProjectZip = async (req, res) => {
             if (isIgnoredPath(entryName)) {
                 skippedCount++
                 continue
+            }
+
+            relevantCount++
+            if (relevantCount > MAX_ENTRIES) {
+                return res.status(400).json({
+                    message: `Zip has too many relevant files (max ${MAX_ENTRIES} after ignoring node_modules/.git/etc.)`
+                })
             }
 
             const filename = entryName.split('/').pop()
@@ -100,10 +106,9 @@ exports.uploadProjectZip = async (req, res) => {
 
         const inserted = await File.insertMany(filesToInsert)
 
-        // ---------------- CHUNK + EMBED EACH FILE ----------------
+        // ---------------- CHUNK + EMBED + INDEX ----------------
         // Best-effort: if the AI service is unreachable, the files are still
-        // saved above; we just skip embeddings for now rather than failing
-        // the whole upload. embeddingError (if present) tells the caller so.
+        // saved above; embeddingError tells the caller what didn't happen.
         let chunksStored = 0
         let embeddingError = null
 
@@ -132,6 +137,31 @@ exports.uploadProjectZip = async (req, res) => {
 
                 const insertedChunks = await Chunk.insertMany(chunkDocs)
                 chunksStored = insertedChunks.length
+
+                // Push the same vectors into ChromaDB for similarity search
+                const fileById = new Map(inserted.map((f) => [f._id.toString(), f]))
+
+                try {
+                    await indexChunks(
+                        insertedChunks.map((c) => {
+                            const file = fileById.get(c.file.toString())
+                            return {
+                                id: c._id.toString(),
+                                text: c.text,
+                                embedding: c.embedding,
+                                project_id: project._id.toString(),
+                                file_id: c.file.toString(),
+                                filename: file.filename,
+                                path: file.path || "",
+                                chunk_index: c.chunkIndex
+                            }
+                        })
+                    )
+                }
+                catch (err) {
+                    console.log("Vector indexing failed:", err.message)
+                    embeddingError = `Chunks were saved, but vector indexing failed: ${err.message}`
+                }
             }
         }
         catch (err) {
@@ -211,7 +241,7 @@ exports.getFileById = async (req, res) => {
     }
 }
 
-// ---------------- DELETE ONE FILE ----------------
+// ---------------- DELETE ONE FILE (AND ITS CHUNKS/VECTORS) ----------------
 exports.deleteFile = async (req, res) => {
     console.log("Inside delete file")
     try {
@@ -227,10 +257,46 @@ exports.deleteFile = async (req, res) => {
             return res.status(404).json({ message: "File not found" })
         }
 
+        await Chunk.deleteMany({ file: fileId })
+
+        try {
+            await deleteFileVectors(fileId)
+        }
+        catch (err) {
+            console.log("Could not delete vectors:", err.message)
+        }
+
         res.status(200).json({ message: "File deleted successfully" })
     }
     catch (err) {
         console.log(err.message)
         return res.status(500).json({ message: "Internal server error" })
+    }
+}
+
+// ---------------- SEMANTIC SEARCH WITHIN A PROJECT ----------------
+exports.searchProject = async (req, res) => {
+    console.log("Inside search project")
+    try {
+        const { projectId } = req.params
+        const { query, topK } = req.body
+
+        if (!query || !query.trim()) {
+            return res.status(400).json({ message: "Query is required" })
+        }
+
+        const project = await findOwnedProject(projectId, req.user.id)
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" })
+        }
+
+        const limit = Math.min(Math.max(parseInt(topK) || 5, 1), 20)
+        const results = await searchChunks(projectId, query.trim(), limit)
+
+        res.status(200).json({ message: "Search complete", results })
+    }
+    catch (err) {
+        console.log(err.message)
+        return res.status(500).json({ message: "Search failed: " + err.message })
     }
 }
