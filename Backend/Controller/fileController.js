@@ -2,7 +2,7 @@ const AdmZip = require('adm-zip')
 const Project = require('../Schema/projectSchema')
 const File = require('../Schema/fileSchema')
 const Chunk = require('../Schema/chunkSchema')
-const { classifyFile, isIgnoredPath } = require('../utils/fileClassifier')
+const { classifyFile, findIgnoredSegment, getExtension, EXTENSION_MAP } = require('../utils/fileClassifier')
 const { startIndexJob, getJob, isRunning } = require('../utils/indexJobs')
 const { searchChunks, askQuestion, deleteFileVectors, deleteProjectVectors } = require('../utils/vectorClient')
 
@@ -42,6 +42,11 @@ exports.uploadProjectZip = async (req, res) => {
         let skippedCount = 0
         let relevantCount = 0
 
+        // Why files were skipped, so the UI can show what happened to a big zip
+        const ignoredFolders = {}   // { node_modules: 25000, ".git": 300 }
+        const unsupportedTypes = {} // { css: 40, png: 12 }
+        let generatedFiles = 0      // package-lock.json, *.min.js, *.map
+
         for (const entry of entries) {
             if (entry.isDirectory) continue
 
@@ -52,7 +57,9 @@ exports.uploadProjectZip = async (req, res) => {
                 skippedCount++
                 continue
             }
-            if (isIgnoredPath(entryName)) {
+            const ignoredSegment = findIgnoredSegment(entryName)
+            if (ignoredSegment) {
+                ignoredFolders[ignoredSegment] = (ignoredFolders[ignoredSegment] || 0) + 1
                 skippedCount++
                 continue
             }
@@ -71,6 +78,13 @@ exports.uploadProjectZip = async (req, res) => {
 
             const classification = classifyFile(filename)
             if (!classification) {
+                const ext = getExtension(filename)
+                if (ext && EXTENSION_MAP[ext]) {
+                    generatedFiles++ // supported type, but a lock/minified/map file
+                } else {
+                    const label = ext || "(no extension)"
+                    unsupportedTypes[label] = (unsupportedTypes[label] || 0) + 1
+                }
                 skippedCount++
                 continue
             }
@@ -103,6 +117,13 @@ exports.uploadProjectZip = async (req, res) => {
             })
         }
 
+        // Which folders the stored files came from (first 3 path segments)
+        const storedByFolder = {}
+        for (const file of filesToInsert) {
+            const label = file.path ? file.path.split("/").slice(0, 3).join("/") : "(root)"
+            storedByFolder[label] = (storedByFolder[label] || 0) + 1
+        }
+
         const inserted = await File.insertMany(filesToInsert)
 
         // Files are saved. Chunking/embedding/indexing runs in the background so the
@@ -114,6 +135,14 @@ exports.uploadProjectZip = async (req, res) => {
             filesStored: inserted.length,
             filesSkipped: skippedCount,
             indexing: true,
+            summary: {
+                storedByFolder,
+                ignoredFolders,
+                unsupportedTypes: Object.fromEntries(
+                    Object.entries(unsupportedTypes).sort((a, b) => b[1] - a[1]).slice(0, 8)
+                ),
+                generatedFiles
+            },
             files: inserted.map((f) => ({
                 _id: f._id,
                 filename: f.filename,
@@ -259,7 +288,7 @@ exports.askProject = async (req, res) => {
             return res.status(404).json({ message: "Project not found" })
         }
 
-        const limit = Math.min(Math.max(parseInt(topK) || 6, 1), 12)
+        const limit = Math.min(Math.max(parseInt(topK) || 8, 1), 12)
         const data = await askQuestion(projectId, question.trim(), limit)
 
         res.status(200).json({ message: "Answer generated", answer: data.answer, sources: data.sources })

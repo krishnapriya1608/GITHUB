@@ -132,7 +132,8 @@ function ProjectDetail() {
                 setUploadStatus({
                     ok: true,
                     filesStored: res.data.filesStored,
-                    filesSkipped: res.data.filesSkipped
+                    filesSkipped: res.data.filesSkipped,
+                    summary: res.data.summary
                 })
                 setIndexStatus({ state: "indexing", done: 0, total: 0 })
                 loadFiles()
@@ -230,7 +231,7 @@ function ProjectDetail() {
         setAskError(null)
         setAnswer(null)
         try {
-            const res = await askProjectAPI(id, { question, topK: 6 })
+            const res = await askProjectAPI(id, { question, topK: 8 })
             if (res.status === 200) {
                 setAnswer({ text: res.data.answer, sources: res.data.sources })
             } else {
@@ -262,7 +263,7 @@ function ProjectDetail() {
                     type="button"
                     onClick={() => openSource(source)}
                     title={`${source.filename} lines ${source.start_line}-${source.end_line}`}
-                    className="mx-0.5 rounded bg-teal-100 px-1 font-mono text-[11px] font-medium text-teal-800 hover:bg-teal-200"
+                    className="mx-0.5 rounded-md bg-teal-400/15 px-1.5 font-mono text-[11px] font-medium text-teal-300 hover:bg-teal-400/25"
                 >
                     {match[1]}
                 </button>
@@ -275,25 +276,35 @@ function ProjectDetail() {
         return `${(bytes / 1024).toFixed(1)} KB`
     }
 
+    // shared "glossy bento card" shell used by every panel on the page
+    const cardClass =
+        "rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] " +
+        "shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset] backdrop-blur-sm"
+
     return (
-        <div className="min-h-screen bg-neutral-50">
+        <div className="min-h-screen bg-neutral-950 text-neutral-100">
+            {/* ambient glow, like the reference background */}
+            <div className="pointer-events-none fixed inset-0 overflow-hidden">
+                <div className="absolute -top-40 left-1/2 h-96 w-[60rem] -translate-x-1/2 rounded-full bg-teal-500/10 blur-3xl" />
+            </div>
+
             {/* Top bar */}
-            <div className="border-b border-neutral-200 bg-white">
-                <div className="mx-auto max-w-6xl px-6 py-5">
+            <div className="relative border-b border-white/10 bg-neutral-950/80 backdrop-blur">
+                <div className="mx-auto max-w-6xl px-6 py-6">
                     <Link
-                        to="/"
-                        className="text-sm text-neutral-500 hover:text-teal-700 transition-colors"
+                        to="/dash"
+                        className="text-sm text-neutral-400 hover:text-teal-300 transition-colors"
                     >
                         ← Back to projects
                     </Link>
 
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
                         <div>
-                            <h2 className="text-2xl font-semibold text-neutral-900">
+                            <h2 className="text-2xl font-bold tracking-tight text-white">
                                 {project?.name}
                             </h2>
                             {project?.description && (
-                                <p className="mt-1 text-sm text-neutral-500">{project.description}</p>
+                                <p className="mt-1 text-sm text-neutral-400">{project.description}</p>
                             )}
                         </div>
 
@@ -303,9 +314,9 @@ function ProjectDetail() {
                                 onClick={handleReindex}
                                 disabled={reindexing || uploading || indexStatus?.state === "indexing" || files.length === 0}
                                 title="Re-chunk and re-embed the stored files without re-uploading"
-                                className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium
-                                           text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed
-                                           disabled:opacity-50 transition-colors"
+                                className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium
+                                           text-neutral-200 hover:bg-white/10 disabled:cursor-not-allowed
+                                           disabled:opacity-40 transition-colors"
                             >
                                 {reindexing ? "Rebuilding…" : "Rebuild index"}
                             </button>
@@ -313,9 +324,9 @@ function ProjectDetail() {
                                 type="button"
                                 onClick={handleUploadClick}
                                 disabled={uploading}
-                                className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white
-                                           hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60
-                                           transition-colors"
+                                className="rounded-full bg-teal-400 px-4 py-2 text-sm font-semibold text-neutral-950
+                                           shadow-[0_0_24px_-4px_rgba(45,212,191,0.6)] hover:bg-teal-300
+                                           disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
                             >
                                 {uploading ? "Uploading…" : "Upload .zip"}
                             </button>
@@ -331,14 +342,14 @@ function ProjectDetail() {
                 </div>
             </div>
 
-            <div className="mx-auto max-w-6xl px-6 py-6">
+            <div className="relative mx-auto max-w-6xl px-6 py-6">
                 {/* Upload status banner */}
                 {uploadStatus && (
                     <div
-                        className={`mb-6 flex items-start justify-between gap-4 rounded-md border px-4 py-3 text-sm ${
+                        className={`mb-6 flex items-start justify-between gap-4 rounded-2xl border px-4 py-3 text-sm backdrop-blur-sm ${
                             uploadStatus.ok
-                                ? "border-teal-200 bg-teal-50 text-teal-900"
-                                : "border-red-200 bg-red-50 text-red-900"
+                                ? "border-teal-400/20 bg-teal-400/[0.07] text-teal-100"
+                                : "border-red-400/20 bg-red-400/[0.07] text-red-100"
                         }`}
                     >
                         <div>
@@ -346,17 +357,51 @@ function ProjectDetail() {
                                 <>
                                     <p>
                                         {uploadStatus.kind === "reindex" ? (
-                                            <>Re-indexed <span className="font-medium">{uploadStatus.filesStored}</span> file(s).</>
+                                            <>Re-indexed <span className="font-semibold text-white">{uploadStatus.filesStored}</span> file(s).</>
                                         ) : (
-                                            <>Stored <span className="font-medium">{uploadStatus.filesStored}</span> file(s),
+                                            <>Stored <span className="font-semibold text-white">{uploadStatus.filesStored}</span> file(s),
                                             skipped {uploadStatus.filesSkipped}.</>
                                         )}
                                         {uploadStatus.chunksStored > 0 && (
-                                            <> Generated <span className="font-medium">{uploadStatus.chunksStored}</span> embedded chunk(s).</>
+                                            <> Generated <span className="font-semibold text-white">{uploadStatus.chunksStored}</span> embedded chunk(s).</>
                                         )}
                                     </p>
+                                    {uploadStatus.summary && (
+                                        <details className="mt-2 text-xs text-neutral-300">
+                                            <summary className="cursor-pointer text-teal-300 underline decoration-teal-300/40">
+                                                What was stored and skipped?
+                                            </summary>
+                                            <div className="mt-2 space-y-2">
+                                                <div>
+                                                    <p className="font-medium text-neutral-200">Stored, by folder</p>
+                                                    {Object.entries(uploadStatus.summary.storedByFolder).map(([folder, n]) => (
+                                                        <p key={folder} className="font-mono">{folder}: {n}</p>
+                                                    ))}
+                                                </div>
+                                                {Object.keys(uploadStatus.summary.ignoredFolders).length > 0 && (
+                                                    <div>
+                                                        <p className="font-medium text-neutral-200">Skipped, inside ignored folders</p>
+                                                        {Object.entries(uploadStatus.summary.ignoredFolders).map(([folder, n]) => (
+                                                            <p key={folder} className="font-mono">{folder}: {n}</p>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {Object.keys(uploadStatus.summary.unsupportedTypes).length > 0 && (
+                                                    <div>
+                                                        <p className="font-medium text-neutral-200">Skipped, unsupported file types</p>
+                                                        {Object.entries(uploadStatus.summary.unsupportedTypes).map(([ext, n]) => (
+                                                            <p key={ext} className="font-mono">.{ext.replace(/^\./, "")}: {n}</p>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {uploadStatus.summary.generatedFiles > 0 && (
+                                                    <p>Lock / minified / map files skipped: {uploadStatus.summary.generatedFiles}</p>
+                                                )}
+                                            </div>
+                                        </details>
+                                    )}
                                     {uploadStatus.embeddingError && (
-                                        <p className="mt-1 font-medium text-amber-700">
+                                        <p className="mt-1 font-medium text-amber-300">
                                             ⚠ {uploadStatus.embeddingError}
                                         </p>
                                     )}
@@ -368,7 +413,7 @@ function ProjectDetail() {
                         <button
                             type="button"
                             onClick={() => setUploadStatus(null)}
-                            className="shrink-0 rounded border border-current px-2 py-1 text-xs hover:opacity-70"
+                            className="shrink-0 rounded-full border border-current px-2 py-1 text-xs hover:opacity-70"
                         >
                             Dismiss
                         </button>
@@ -378,12 +423,12 @@ function ProjectDetail() {
                 {/* Background indexing progress */}
                 {indexStatus && indexStatus.state !== "idle" && (
                     <div
-                        className={`mb-6 rounded-md border px-4 py-3 text-sm ${
+                        className={`mb-6 rounded-2xl border px-4 py-3 text-sm backdrop-blur-sm ${
                             indexStatus.state === "error"
-                                ? "border-red-200 bg-red-50 text-red-900"
+                                ? "border-red-400/20 bg-red-400/[0.07] text-red-100"
                                 : indexStatus.state === "done"
-                                ? "border-teal-200 bg-teal-50 text-teal-900"
-                                : "border-neutral-200 bg-white text-neutral-700"
+                                ? "border-teal-400/20 bg-teal-400/[0.07] text-teal-100"
+                                : "border-white/10 bg-white/[0.04] text-neutral-200"
                         }`}
                     >
                         <div className="flex items-start justify-between gap-4">
@@ -392,15 +437,15 @@ function ProjectDetail() {
                                     <>
                                         <p>
                                             Indexing for search…{" "}
-                                            <span className="font-medium">
+                                            <span className="font-semibold text-white">
                                                 {indexStatus.total > 0
                                                     ? `${indexStatus.done} / ${indexStatus.total} chunks`
                                                     : "preparing"}
                                             </span>
                                         </p>
-                                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-neutral-200">
+                                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                                             <div
-                                                className="h-full bg-teal-600 transition-all duration-500"
+                                                className="h-full rounded-full bg-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.7)] transition-all duration-500"
                                                 style={{
                                                     width: `${indexStatus.total > 0 ? Math.round((indexStatus.done / indexStatus.total) * 100) : 3}%`
                                                 }}
@@ -417,7 +462,7 @@ function ProjectDetail() {
                                 )}
                                 {indexStatus.state === "error" && (
                                     <>
-                                        <p className="font-medium">Indexing stopped.</p>
+                                        <p className="font-semibold text-white">Indexing stopped.</p>
                                         <p className="mt-1">{indexStatus.error}</p>
                                         <p className="mt-1 text-xs">
                                             Fix the cause, then click Rebuild index. Your files are safe.
@@ -429,7 +474,7 @@ function ProjectDetail() {
                                 <button
                                     type="button"
                                     onClick={() => setIndexStatus(null)}
-                                    className="shrink-0 rounded border border-current px-2 py-1 text-xs hover:opacity-70"
+                                    className="shrink-0 rounded-full border border-current px-2 py-1 text-xs hover:opacity-70"
                                 >
                                     Dismiss
                                 </button>
@@ -439,41 +484,44 @@ function ProjectDetail() {
                 )}
 
                 {/* Ask the codebase */}
-                <div className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
+                <div className={`mb-6 p-6 ${cardClass}`}>
+                    <h3 className="mb-3 text-lg font-bold text-white">Ask the codebase</h3>
                     <form onSubmit={handleAsk} className="flex gap-2">
                         <input
                             type="text"
                             value={question}
                             onChange={(e) => setQuestion(e.target.value)}
                             placeholder="Ask about this codebase, e.g. &quot;how does authentication work?&quot;"
-                            className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm
-                                       focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                            className="flex-1 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-neutral-100
+                                       placeholder:text-neutral-500 focus:border-teal-400/50 focus:outline-none
+                                       focus:ring-1 focus:ring-teal-400/50"
                         />
                         <button
                             type="submit"
                             disabled={asking}
-                            className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white
-                                       hover:bg-teal-800 disabled:opacity-60 transition-colors"
+                            className="rounded-full bg-teal-400 px-5 py-2.5 text-sm font-semibold text-neutral-950
+                                       shadow-[0_0_24px_-4px_rgba(45,212,191,0.6)] hover:bg-teal-300
+                                       disabled:opacity-60 transition-colors"
                         >
                             {asking ? "Thinking…" : "Ask"}
                         </button>
                     </form>
 
                     {askError && (
-                        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                        <p className="mt-3 rounded-2xl border border-red-400/20 bg-red-400/[0.07] px-3 py-2 text-sm text-red-100">
                             {askError}
                         </p>
                     )}
 
                     {answer && (
                         <div className="mt-4">
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-800">
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-200">
                                 {renderAnswer(answer.text, answer.sources)}
                             </p>
 
                             {answer.sources.length > 0 && (
-                                <div className="mt-4 border-t border-neutral-100 pt-3">
-                                    <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+                                <div className="mt-4 border-t border-white/10 pt-3">
+                                    <span className="text-xs font-medium uppercase tracking-wide text-neutral-500">
                                         Sources
                                     </span>
                                     <ul className="mt-2 space-y-1">
@@ -482,16 +530,16 @@ function ProjectDetail() {
                                                 <button
                                                     type="button"
                                                     onClick={() => openSource(src)}
-                                                    className="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-neutral-50"
+                                                    className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-white/5"
                                                 >
-                                                    <span className="shrink-0 rounded bg-teal-100 px-1.5 font-mono text-[11px] font-medium text-teal-800">
+                                                    <span className="shrink-0 rounded-md bg-teal-400/15 px-1.5 font-mono text-[11px] font-medium text-teal-300">
                                                         {src.number}
                                                     </span>
-                                                    <span className="truncate font-mono text-xs text-neutral-700">
-                                                        {src.path && <span className="text-neutral-400">{src.path}/</span>}
+                                                    <span className="truncate font-mono text-xs text-neutral-300">
+                                                        {src.path && <span className="text-neutral-500">{src.path}/</span>}
                                                         {src.filename}
                                                     </span>
-                                                    <span className="shrink-0 text-xs text-neutral-400">
+                                                    <span className="shrink-0 text-xs text-neutral-500">
                                                         lines {src.start_line}–{src.end_line}
                                                     </span>
                                                 </button>
@@ -505,21 +553,24 @@ function ProjectDetail() {
                 </div>
 
                 {/* Semantic search */}
-                <div className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
+                <div className={`mb-6 p-6 ${cardClass}`}>
+                    <h3 className="mb-3 text-lg font-bold text-white">Search this project</h3>
                     <form onSubmit={handleSearch} className="flex gap-2">
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search this project by meaning, e.g. &quot;how does login work?&quot;"
-                            className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm
-                                       focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                            placeholder="Search by meaning, e.g. &quot;how does login work?&quot;"
+                            className="flex-1 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-neutral-100
+                                       placeholder:text-neutral-500 focus:border-teal-400/50 focus:outline-none
+                                       focus:ring-1 focus:ring-teal-400/50"
                         />
                         <button
                             type="submit"
                             disabled={searching}
-                            className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white
-                                       hover:bg-teal-800 disabled:opacity-60 transition-colors"
+                            className="rounded-full bg-teal-400 px-5 py-2.5 text-sm font-semibold text-neutral-950
+                                       shadow-[0_0_24px_-4px_rgba(45,212,191,0.6)] hover:bg-teal-300
+                                       disabled:opacity-60 transition-colors"
                         >
                             {searching ? "Searching…" : "Search"}
                         </button>
@@ -528,20 +579,20 @@ function ProjectDetail() {
                     {searchResults && (
                         <div className="mt-4">
                             <div className="mb-2 flex items-center justify-between">
-                                <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+                                <span className="text-xs font-medium uppercase tracking-wide text-neutral-500">
                                     {searchResults.length} result(s)
                                 </span>
                                 <button
                                     type="button"
                                     onClick={() => setSearchResults(null)}
-                                    className="text-xs text-neutral-400 hover:text-neutral-700"
+                                    className="text-xs text-neutral-500 hover:text-neutral-200"
                                 >
                                     Clear
                                 </button>
                             </div>
 
                             {searchResults.length === 0 ? (
-                                <p className="text-sm text-neutral-400">
+                                <p className="text-sm text-neutral-500">
                                     No matches. Has this project been uploaded since indexing was added?
                                 </p>
                             ) : (
@@ -551,18 +602,19 @@ function ProjectDetail() {
                                             <button
                                                 type="button"
                                                 onClick={() => handleViewFile(r.file_id, r.start_line, r.end_line)}
-                                                className="w-full rounded-md border border-neutral-200 p-3 text-left hover:border-teal-400 hover:bg-teal-50/40 transition-colors"
+                                                className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-left
+                                                           hover:border-teal-400/30 hover:bg-teal-400/[0.06] transition-colors"
                                             >
                                                 <div className="mb-1 flex items-center justify-between gap-2">
-                                                    <span className="truncate font-mono text-xs text-neutral-700">
-                                                        {r.path && <span className="text-neutral-400">{r.path}/</span>}
+                                                    <span className="truncate font-mono text-xs text-neutral-300">
+                                                        {r.path && <span className="text-neutral-500">{r.path}/</span>}
                                                         {r.filename}
                                                     </span>
-                                                    <span className="shrink-0 rounded bg-teal-100 px-1.5 py-0.5 font-mono text-[10px] font-medium text-teal-800">
+                                                    <span className="shrink-0 rounded-full bg-teal-400/15 px-2 py-0.5 font-mono text-[10px] font-medium text-teal-300">
                                                         {(r.score * 100).toFixed(0)}% match
                                                     </span>
                                                 </div>
-                                                <pre className="max-h-40 overflow-auto whitespace-pre-wrap font-mono text-xs text-neutral-500">
+                                                <pre className="max-h-40 overflow-auto whitespace-pre-wrap font-mono text-xs text-neutral-400">
                                                     {r.text}
                                                 </pre>
                                             </button>
@@ -574,18 +626,18 @@ function ProjectDetail() {
                     )}
                 </div>
 
-                {/* File browser: explorer-style sidebar + editor-style preview */}
+                {/* File browser: bento-style sidebar + preview */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-[280px_1fr]">
                     {/* File list */}
-                    <div className="rounded-lg border border-neutral-200 bg-white">
-                        <div className="border-b border-neutral-200 px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-neutral-400">
+                    <div className={`overflow-hidden ${cardClass}`}>
+                        <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">
                             Files
                         </div>
 
                         {loading ? (
-                            <p className="px-4 py-6 text-sm text-neutral-400">Loading files…</p>
+                            <p className="px-4 py-6 text-sm text-neutral-500">Loading files…</p>
                         ) : files.length === 0 ? (
-                            <p className="px-4 py-6 text-sm text-neutral-400">
+                            <p className="px-4 py-6 text-sm text-neutral-500">
                                 No files yet. Upload a .zip to get started.
                             </p>
                         ) : (
@@ -595,8 +647,8 @@ function ProjectDetail() {
                                     return (
                                         <li
                                             key={file._id}
-                                            className={`group flex items-center justify-between gap-2 border-b border-neutral-100 px-3 py-2 last:border-b-0 ${
-                                                active ? "bg-teal-50" : "hover:bg-neutral-50"
+                                            className={`group flex items-center justify-between gap-2 border-b border-white/5 px-3 py-2 last:border-b-0 ${
+                                                active ? "bg-teal-400/10" : "hover:bg-white/5"
                                             }`}
                                         >
                                             <button
@@ -605,30 +657,30 @@ function ProjectDetail() {
                                                 className="flex min-w-0 flex-1 items-center gap-2 text-left"
                                             >
                                                 <span
-                                                    className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase ${
+                                                    className={`shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase ${
                                                         file.type === "code"
-                                                            ? "bg-teal-100 text-teal-800"
-                                                            : "bg-amber-100 text-amber-800"
+                                                            ? "bg-teal-400/15 text-teal-300"
+                                                            : "bg-amber-400/15 text-amber-300"
                                                     }`}
                                                 >
                                                     {file.extension}
                                                 </span>
-                                                <span className="truncate font-mono text-sm text-neutral-700">
+                                                <span className="truncate font-mono text-sm text-neutral-300">
                                                     {file.path && (
-                                                        <span className="text-neutral-400">{file.path}/</span>
+                                                        <span className="text-neutral-500">{file.path}/</span>
                                                     )}
                                                     {file.filename}
                                                 </span>
                                             </button>
 
-                                            <span className="shrink-0 text-xs text-neutral-400">
+                                            <span className="shrink-0 text-xs text-neutral-500">
                                                 {formatBytes(file.size)}
                                             </span>
 
                                             <button
                                                 type="button"
                                                 onClick={() => handleDeleteFile(file._id)}
-                                                className="shrink-0 text-neutral-300 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                                                className="shrink-0 text-neutral-600 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
                                                 aria-label="Delete file"
                                             >
                                                 ✕
@@ -641,21 +693,21 @@ function ProjectDetail() {
                     </div>
 
                     {/* Preview pane */}
-                    <div className="rounded-lg border border-neutral-800 bg-neutral-900 overflow-hidden">
+                    <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm">
                         {selectedFile ? (
                             <>
-                                <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+                                <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                                     <span className="truncate font-mono text-sm text-neutral-300">
                                         {selectedFile.path && `${selectedFile.path}/`}
                                         {selectedFile.filename}
                                     </span>
                                     {selectedFile.truncated && (
-                                        <span className="shrink-0 rounded bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
+                                        <span className="shrink-0 rounded-full bg-amber-400/10 px-2 py-0.5 text-xs font-medium text-amber-400">
                                             truncated
                                         </span>
                                     )}
                                 </div>
-                                <div className="max-h-[70vh] overflow-auto py-3 font-mono text-xs leading-relaxed text-neutral-200">
+                                <div className="max-h-[70vh] overflow-auto py-3 font-mono text-xs leading-relaxed text-neutral-300">
                                     {selectedFile.content.split("\n").map((line, i) => {
                                         const n = i + 1
                                         const inRange = highlight && n >= highlight.start && n <= highlight.end
@@ -663,7 +715,7 @@ function ProjectDetail() {
                                             <div
                                                 key={n}
                                                 ref={highlight && n === highlight.start ? highlightRef : null}
-                                                className={`flex ${inRange ? "bg-teal-400/15" : ""}`}
+                                                className={`flex ${inRange ? "bg-teal-400/10" : ""}`}
                                             >
                                                 <span className="w-12 shrink-0 select-none pr-3 text-right text-neutral-600">
                                                     {n}

@@ -139,6 +139,6 @@ async def ask(payload: AskRequest):
 
 # ---------------- DIAGNOSTICS ----------------
 @app.get("/stats")
-async def stats(project_id: str = None):
-    """Open http://localhost:8000/stats?project_id=<id> to see what is indexed."""
-    return vectorstore.stats(project_id)
+async def stats(project_id: str = None, depth: int = 3):
+    """Open http://127.0.0.1:8000/stats?project_id=<id> to see what is indexed, by folder."""
+    return vectorstore.stats(project_id, depth)

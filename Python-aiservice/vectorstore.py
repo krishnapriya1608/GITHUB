@@ -53,13 +53,19 @@ def upsert_chunks(chunks: List[Dict[str, Any]]) -> int:
     return total
 
 
-def search(project_id: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-    """Embed the query, return the top_k most similar chunks in this project."""
+def search(project_id: str, query: str, top_k: int = 5, max_per_file: int = 2) -> List[Dict[str, Any]]:
+    """
+    Embed the query and return the top_k most similar chunks in this project.
+
+    At most `max_per_file` chunks come from any single file, so one file with many
+    similar chunks can't fill every slot and hide the rest of the codebase
+    (e.g. a frontend page crowding out the backend controller).
+    """
     query_vector = embed_single(query)
 
     result = _collection.query(
         query_embeddings=[query_vector],
-        n_results=top_k,
+        n_results=min(top_k * 5, 50),  # fetch extra candidates, then diversify
         where={"project_id": project_id},
     )
 
@@ -68,7 +74,7 @@ def search(project_id: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     metas = result["metadatas"][0]
     distances = result["distances"][0]
 
-    return [
+    ranked = [
         {
             "chunk_id": ids[i],
             "text": docs[i],
@@ -83,6 +89,24 @@ def search(project_id: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         for i in range(len(ids))
     ]
 
+    picked, per_file = [], {}
+    for r in ranked:
+        if per_file.get(r["file_id"], 0) >= max_per_file:
+            continue
+        per_file[r["file_id"]] = per_file.get(r["file_id"], 0) + 1
+        picked.append(r)
+        if len(picked) == top_k:
+            return picked
+
+    # not enough distinct files: fill the remaining slots with the best leftovers
+    for r in ranked:
+        if len(picked) == top_k:
+            break
+        if r not in picked:
+            picked.append(r)
+
+    return sorted(picked, key=lambda r: -r["score"])
+
 
 def delete_file(file_id: str) -> None:
     _collection.delete(where={"file_id": file_id})
@@ -92,11 +116,28 @@ def delete_project(project_id: str) -> None:
     _collection.delete(where={"project_id": project_id})
 
 
-def stats(project_id: str = None) -> Dict[str, Any]:
-    """How many vectors are stored, overall and (optionally) for one project."""
+def stats(project_id: str = None, depth: int = 3) -> Dict[str, Any]:
+    """
+    How many vectors are stored, overall and (optionally) for one project, with a
+    per-folder breakdown so you can see WHICH parts of the codebase are indexed.
+    `depth` = how many path segments make up a folder label.
+    """
     out = {"total_vectors": _collection.count()}
+
     if project_id:
-        found = _collection.get(where={"project_id": project_id}, include=[])
+        found = _collection.get(where={"project_id": project_id}, include=["metadatas"])
+        metas = found["metadatas"]
+
+        files, folders = set(), {}
+        for m in metas:
+            path = m.get("path", "")
+            files.add(f"{path}/{m['filename']}" if path else m["filename"])
+            label = "/".join(path.split("/")[:depth]) if path else "(root)"
+            folders[label] = folders.get(label, 0) + 1
+
         out["project_id"] = project_id
-        out["project_vectors"] = len(found["ids"])
+        out["project_vectors"] = len(metas)
+        out["files_indexed"] = len(files)
+        out["chunks_by_folder"] = dict(sorted(folders.items(), key=lambda kv: -kv[1]))
+
     return out

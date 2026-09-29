@@ -71,12 +71,19 @@ export const deleteFileAPI = async (projectId, fileId) => {
     return await commonAPI('DELETE', `${serverURL}/api/${projectId}/files/${fileId}`, {}, authHeader())
 }
 
-// Add both of these to the bottom of frontend/src/service/allAPI.js
+// ---------------- Search, Ask, and indexing ----------------
 export const searchProjectAPI = async (projectId, body) => {
     return await commonAPI('POST', `${serverURL}/api/${projectId}/files/search`, body, authHeader())
 }
- 
+
 export const askProjectAPI = async (projectId, body) => {
     return await commonAPI('POST', `${serverURL}/api/${projectId}/files/ask`, body, authHeader())
 }
 
+export const reindexProjectAPI = async (projectId) => {
+    return await commonAPI('POST', `${serverURL}/api/${projectId}/files/reindex`, {}, authHeader())
+}
+
+export const getIndexStatusAPI = async (projectId) => {
+    return await commonAPI('GET', `${serverURL}/api/${projectId}/files/index-status`, {}, authHeader())
+}
