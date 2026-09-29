@@ -7,10 +7,10 @@ import {
     getFileByIdAPI,
     deleteFileAPI,
     searchProjectAPI,
-    askProjectAPI,
     reindexProjectAPI,
     getIndexStatusAPI
 } from '../service/allAPI'
+import AskChat from '../components/AskChat'
 
 function ProjectDetail() {
     const { id } = useParams()
@@ -26,12 +26,8 @@ function ProjectDetail() {
     const [searchQuery, setSearchQuery] = useState("")
     const [searchResults, setSearchResults] = useState(null)
     const [searching, setSearching] = useState(false)
-    const [question, setQuestion] = useState("")
-    const [answer, setAnswer] = useState(null)
-    const [asking, setAsking] = useState(false)
     const [reindexing, setReindexing] = useState(false)
     const [indexStatus, setIndexStatus] = useState(null)
-    const [askError, setAskError] = useState(null)
     const [highlight, setHighlight] = useState(null)
     const highlightRef = useRef(null)
 
@@ -223,52 +219,8 @@ function ProjectDetail() {
         }
     }
 
-    const handleAsk = async (e) => {
-        e.preventDefault()
-        if (!question.trim()) return
-
-        setAsking(true)
-        setAskError(null)
-        setAnswer(null)
-        try {
-            const res = await askProjectAPI(id, { question, topK: 8 })
-            if (res.status === 200) {
-                setAnswer({ text: res.data.answer, sources: res.data.sources })
-            } else {
-                setAskError(res.data?.message || "Could not generate an answer")
-            }
-        }
-        catch (err) {
-            console.log(err.message)
-            setAskError("Something went wrong while asking.")
-        }
-        finally {
-            setAsking(false)
-        }
-    }
-
     const openSource = (source) => {
         handleViewFile(source.file_id, source.start_line, source.end_line)
-    }
-
-    // Turn "[1]" markers in the answer into clickable citation chips
-    const renderAnswer = (text, sources) => {
-        return text.split(/(\[\d+\])/g).map((part, i) => {
-            const match = part.match(/^\[(\d+)\]$/)
-            const source = match && sources.find((s) => s.number === Number(match[1]))
-            if (!source) return <span key={i}>{part}</span>
-            return (
-                <button
-                    key={i}
-                    type="button"
-                    onClick={() => openSource(source)}
-                    title={`${source.filename} lines ${source.start_line}-${source.end_line}`}
-                    className="mx-0.5 rounded-md bg-teal-400/15 px-1.5 font-mono text-[11px] font-medium text-teal-300 hover:bg-teal-400/25"
-                >
-                    {match[1]}
-                </button>
-            )
-        })
     }
 
     const formatBytes = (bytes) => {
@@ -483,74 +435,8 @@ function ProjectDetail() {
                     </div>
                 )}
 
-                {/* Ask the codebase */}
-                <div className={`mb-6 p-6 ${cardClass}`}>
-                    <h3 className="mb-3 text-lg font-bold text-white">Ask the codebase</h3>
-                    <form onSubmit={handleAsk} className="flex gap-2">
-                        <input
-                            type="text"
-                            value={question}
-                            onChange={(e) => setQuestion(e.target.value)}
-                            placeholder="Ask about this codebase, e.g. &quot;how does authentication work?&quot;"
-                            className="flex-1 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-neutral-100
-                                       placeholder:text-neutral-500 focus:border-teal-400/50 focus:outline-none
-                                       focus:ring-1 focus:ring-teal-400/50"
-                        />
-                        <button
-                            type="submit"
-                            disabled={asking}
-                            className="rounded-full bg-teal-400 px-5 py-2.5 text-sm font-semibold text-neutral-950
-                                       shadow-[0_0_24px_-4px_rgba(45,212,191,0.6)] hover:bg-teal-300
-                                       disabled:opacity-60 transition-colors"
-                        >
-                            {asking ? "Thinking…" : "Ask"}
-                        </button>
-                    </form>
-
-                    {askError && (
-                        <p className="mt-3 rounded-2xl border border-red-400/20 bg-red-400/[0.07] px-3 py-2 text-sm text-red-100">
-                            {askError}
-                        </p>
-                    )}
-
-                    {answer && (
-                        <div className="mt-4">
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-200">
-                                {renderAnswer(answer.text, answer.sources)}
-                            </p>
-
-                            {answer.sources.length > 0 && (
-                                <div className="mt-4 border-t border-white/10 pt-3">
-                                    <span className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-                                        Sources
-                                    </span>
-                                    <ul className="mt-2 space-y-1">
-                                        {answer.sources.map((src) => (
-                                            <li key={src.chunk_id}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openSource(src)}
-                                                    className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-white/5"
-                                                >
-                                                    <span className="shrink-0 rounded-md bg-teal-400/15 px-1.5 font-mono text-[11px] font-medium text-teal-300">
-                                                        {src.number}
-                                                    </span>
-                                                    <span className="truncate font-mono text-xs text-neutral-300">
-                                                        {src.path && <span className="text-neutral-500">{src.path}/</span>}
-                                                        {src.filename}
-                                                    </span>
-                                                    <span className="shrink-0 text-xs text-neutral-500">
-                                                        lines {src.start_line}–{src.end_line}
-                                                    </span>
-                                                </button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
+                {/* Ask the codebase: chat with history + streaming */}
+                <AskChat projectId={id} onOpenSource={openSource} cardClass={cardClass} />
 
                 {/* Semantic search */}
                 <div className={`mb-6 p-6 ${cardClass}`}>
