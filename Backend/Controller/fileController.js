@@ -4,6 +4,7 @@ const File = require('../Schema/fileSchema')
 const Chunk = require('../Schema/chunkSchema')
 const { classifyFile, findIgnoredSegment, getExtension, EXTENSION_MAP } = require('../utils/fileClassifier')
 const { startIndexJob, getJob, isRunning } = require('../utils/indexJobs')
+const ChatMessage = require('../Schema/chatmessageschema')
 const { searchChunks, askQuestion, askQuestionStream, deleteFileVectors, deleteProjectVectors } = require('../utils/vectorClient')
 const MAX_ENTRIES = 2000            // guard against zip bombs — counts relevant files only, after filtering
 const MAX_FILE_CONTENT_BYTES = 200 * 1024 // truncate any single file's stored content at 200KB
@@ -321,6 +322,8 @@ exports.askProjectStream = async (req, res) => {
             return res.status(404).json({ message: "Project not found" })
         }
 
+        await ChatMessage.create({ project: projectId, role: 'user', content: question.trim() })
+
         // never trust client history: valid roles only, capped size and length
         const safeHistory = (Array.isArray(history) ? history : [])
             .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
@@ -344,12 +347,37 @@ exports.askProjectStream = async (req, res) => {
         res.flushHeaders()
 
         const reader = upstream.body.getReader()
+        const decoder = new TextDecoder()
+        let sseBuffer = ''
+        let answerText = ''
+        let sources = []
+
+        const captureFrame = (frame) => {
+            const line = frame.split('\n').find((l) => l.startsWith('data:'))
+            if (!line) return
+            let event
+            try { event = JSON.parse(line.slice(5).trim()) } catch { return }
+            if (event.type === 'sources') sources = event.sources
+            else if (event.type === 'token') answerText += event.text
+        }
+
         while (true) {
             const { done, value } = await reader.read()
             if (done) break
-            res.write(value)
+            res.write(value) // unchanged: forward raw bytes to the browser immediately
+
+            sseBuffer += decoder.decode(value, { stream: true })
+            let idx
+            while ((idx = sseBuffer.indexOf('\n\n')) !== -1) {
+                captureFrame(sseBuffer.slice(0, idx))
+                sseBuffer = sseBuffer.slice(idx + 2)
+            }
         }
         res.end()
+
+        if (answerText.trim()) {
+            await ChatMessage.create({ project: projectId, role: 'assistant', content: answerText, sources })
+        }
     }
     catch (err) {
         if (err.name === 'AbortError') return // client left; nothing to send
@@ -417,6 +445,45 @@ exports.getIndexStatus = async (req, res) => {
         }
 
         res.status(200).json(getJob(projectId))
+    }
+    catch (err) {
+        console.log(err.message)
+        return res.status(500).json({ message: "Internal server error" })
+    }
+}
+
+// ---------------- CHAT HISTORY (persisted) ----------------
+exports.getChatHistory = async (req, res) => {
+    console.log("Inside get chat history")
+    try {
+        const { projectId } = req.params
+
+        const project = await findOwnedProject(projectId, req.user.id)
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" })
+        }
+
+        const messages = await ChatMessage.find({ project: projectId }).sort({ createdAt: 1 })
+        res.status(200).json({ message: "History fetched", messages })
+    }
+    catch (err) {
+        console.log(err.message)
+        return res.status(500).json({ message: "Internal server error" })
+    }
+}
+
+exports.clearChatHistory = async (req, res) => {
+    console.log("Inside clear chat history")
+    try {
+        const { projectId } = req.params
+
+        const project = await findOwnedProject(projectId, req.user.id)
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" })
+        }
+
+        await ChatMessage.deleteMany({ project: projectId })
+        res.status(200).json({ message: "History cleared" })
     }
     catch (err) {
         console.log(err.message)

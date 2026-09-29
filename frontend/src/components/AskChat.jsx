@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { askProjectStreamAPI } from '../service/allAPI'
+import { askProjectStreamAPI, getChatHistoryAPI, clearChatHistoryAPI } from '../service/allAPI'
 
 const MAX_HISTORY = 10
 
@@ -14,6 +14,7 @@ function AskChat({ projectId, onOpenSource, cardClass }) {
     const [messages, setMessages] = useState([])   // { role, content, sources?, streaming?, error? }
     const [input, setInput] = useState("")
     const [busy, setBusy] = useState(false)
+    const [loadingHistory, setLoadingHistory] = useState(true)
     const abortRef = useRef(null)
     const scrollRef = useRef(null)
     const stickToBottom = useRef(true)
@@ -27,6 +28,29 @@ function AskChat({ projectId, onOpenSource, cardClass }) {
     // Cancel any in-flight answer on unmount or when switching project
     useEffect(() => {
         return () => abortRef.current?.abort()
+    }, [projectId])
+
+    // Load this project's saved conversation once, when it's opened (or on project switch)
+    useEffect(() => {
+        let cancelled = false
+        setLoadingHistory(true)
+        setMessages([])
+
+        getChatHistoryAPI(projectId)
+            .then((res) => {
+                if (cancelled || res.status !== 200) return
+                setMessages(
+                    res.data.messages.map((m) => ({
+                        role: m.role,
+                        content: m.content,
+                        sources: m.sources || []
+                    }))
+                )
+            })
+            .catch((err) => console.log(err.message))
+            .finally(() => { if (!cancelled) setLoadingHistory(false) })
+
+        return () => { cancelled = true }
     }, [projectId])
 
     const onScroll = () => {
@@ -81,10 +105,15 @@ function AskChat({ projectId, onOpenSource, cardClass }) {
 
     const stop = () => abortRef.current?.abort()
 
-    const clearChat = () => {
+    const clearChat = async () => {
         abortRef.current?.abort()
         setMessages([])
         setBusy(false)
+        try {
+            await clearChatHistoryAPI(projectId)
+        } catch (err) {
+            console.log(err.message)
+        }
     }
 
     // Turn "[1]" markers into clickable citation chips
@@ -127,7 +156,11 @@ function AskChat({ projectId, onOpenSource, cardClass }) {
                 onScroll={onScroll}
                 className="max-h-[32rem] space-y-4 overflow-y-auto pr-1"
             >
-                {messages.length === 0 && (
+                {loadingHistory && (
+                    <p className="text-sm text-neutral-500">Loading conversation…</p>
+                )}
+
+                {!loadingHistory && messages.length === 0 && (
                     <div className="flex flex-wrap gap-2">
                         {SUGGESTIONS.map((s) => (
                             <button

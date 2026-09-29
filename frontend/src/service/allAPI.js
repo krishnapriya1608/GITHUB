@@ -148,3 +148,10 @@ export const reindexProjectAPI = async (projectId) => {
 export const getIndexStatusAPI = async (projectId) => {
     return await commonAPI('GET', `${serverURL}/api/${projectId}/files/index-status`, {}, authHeader())
 }
+export const getChatHistoryAPI = async (projectId) => {
+    return await commonAPI('GET', `${serverURL}/api/${projectId}/files/messages`, {}, authHeader())
+}
+
+export const clearChatHistoryAPI = async (projectId) => {
+    return await commonAPI('DELETE', `${serverURL}/api/${projectId}/files/messages`, {}, authHeader())
+}
