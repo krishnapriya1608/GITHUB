@@ -4,8 +4,7 @@ const File = require('../Schema/fileSchema')
 const Chunk = require('../Schema/chunkSchema')
 const { classifyFile, findIgnoredSegment, getExtension, EXTENSION_MAP } = require('../utils/fileClassifier')
 const { startIndexJob, getJob, isRunning } = require('../utils/indexJobs')
-const { searchChunks, askQuestion, deleteFileVectors, deleteProjectVectors } = require('../utils/vectorClient')
-
+const { searchChunks, askQuestion, askQuestionStream, deleteFileVectors, deleteProjectVectors } = require('../utils/vectorClient')
 const MAX_ENTRIES = 2000            // guard against zip bombs — counts relevant files only, after filtering
 const MAX_FILE_CONTENT_BYTES = 200 * 1024 // truncate any single file's stored content at 200KB
 
@@ -296,6 +295,71 @@ exports.askProject = async (req, res) => {
     catch (err) {
         console.log(err.message)
         return res.status(500).json({ message: "Could not generate answer: " + err.message })
+    }
+}// ---------------- CHAT: HISTORY + STREAMING (SSE) ----------------
+// Body: { question, topK?, history?: [{ role: 'user'|'assistant', content }] }
+// The browser keeps the conversation and sends it back each turn, so the server stays stateless.
+exports.askProjectStream = async (req, res) => {
+    console.log("Inside ask project (stream)")
+    const controller = new AbortController()
+    // stop the Python/LLM work if the user closes the tab or presses Stop
+    res.on('close', () => { if (!res.writableEnded) controller.abort() })
+
+    try {
+        const { projectId } = req.params
+        const { question, topK, history } = req.body
+
+        if (!question || !question.trim()) {
+            return res.status(400).json({ message: "Question is required" })
+        }
+        if (question.length > 2000) {
+            return res.status(400).json({ message: "Question is too long (max 2000 characters)" })
+        }
+
+        const project = await findOwnedProject(projectId, req.user.id)
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" })
+        }
+
+        // never trust client history: valid roles only, capped size and length
+        const safeHistory = (Array.isArray(history) ? history : [])
+            .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+            .slice(-10)
+            .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }))
+
+        const limit = Math.min(Math.max(parseInt(topK) || 8, 1), 12)
+        const upstream = await askQuestionStream(projectId, question.trim(), limit, safeHistory, controller.signal)
+
+        if (!upstream.ok || !upstream.body) {
+            const detail = await upstream.text()
+            return res.status(502).json({ message: `AI service error (${upstream.status}): ${detail.slice(0, 300)}` })
+        }
+
+        res.status(200).set({
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-cache, no-transform',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no'
+        })
+        res.flushHeaders()
+
+        const reader = upstream.body.getReader()
+        while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            res.write(value)
+        }
+        res.end()
+    }
+    catch (err) {
+        if (err.name === 'AbortError') return // client left; nothing to send
+        console.log(err.message)
+        if (!res.headersSent) {
+            return res.status(500).json({ message: "Could not generate answer: " + err.message })
+        }
+        // stream already started: report the failure in-band so the UI can show it
+        res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`)
+        res.end()
     }
 }
 

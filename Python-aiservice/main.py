@@ -11,7 +11,9 @@ from file_processor import process_file
 from embeddings import embed_texts, get_model
 import vectorstore
 import rag
-
+from typing import List, Optional
+from fastapi.responses import StreamingResponse
+import json
 @asynccontextmanager
 async def lifespan(app):
     # Load the embedding model once at startup so the first search isn't slow
@@ -136,6 +138,53 @@ async def ask(payload: AskRequest):
 
     return {"answer": answer, "sources": sources}
 
+
+# ---------------- RAG: CHAT WITH HISTORY + STREAMING (SSE) ----------------
+class ChatTurn(BaseModel):
+    role: str
+    content: str
+
+
+class AskStreamRequest(BaseModel):
+    project_id: str
+    question: str
+    top_k: int = 6
+    history: Optional[List[ChatTurn]] = None
+
+
+def _sse(event: dict) -> str:
+    return f"data: {json.dumps(event)}\n\n"
+
+
+@app.post("/ask-stream")
+def ask_stream(payload: AskStreamRequest):
+    """
+    Server-Sent Events. Events, in order:
+      {"type":"sources","sources":[...]}   once, before any text
+      {"type":"token","text":"..."}        many
+      {"type":"done"}                      or {"type":"error","message":"..."}
+    Plain `def` (not async) so FastAPI runs the blocking search/LLM calls in a threadpool.
+    """
+    history = rag.clean_history([t.model_dump() for t in (payload.history or [])])
+
+    def event_stream():
+        try:
+            query = rag.retrieval_query(payload.question, history)
+            results = vectorstore.search(payload.project_id, query, payload.top_k)
+            sources = [{"number": i, **r} for i, r in enumerate(results, start=1)]
+            yield _sse({"type": "sources", "sources": sources})
+
+            for piece in rag.stream_answer(payload.question, results, history):
+                yield _sse({"type": "token", "text": piece})
+            yield _sse({"type": "done"})
+        except Exception as e:
+            yield _sse({"type": "error", "message": str(e)})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 # ---------------- DIAGNOSTICS ----------------
 @app.get("/stats")

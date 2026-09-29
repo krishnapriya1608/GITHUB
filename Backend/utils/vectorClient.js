@@ -49,8 +49,23 @@ const searchChunks = async (projectId, query, topK = 5) => {
 const askQuestion = async (projectId, question, topK = 6) => {
     return call('POST', '/ask', { project_id: projectId, question, top_k: topK })
 }
-
+// Streaming variant: returns the raw fetch Response so the controller can pipe the SSE body through
+const askQuestionStream = async (projectId, question, topK, history, signal) => {
+    let response
+    try {
+        response = await fetch(`${AI_SERVICE_URL}/ask-stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_id: projectId, question, top_k: topK, history }),
+            signal
+        })
+    } catch (err) {
+        if (err.name === 'AbortError') throw err
+        throw explainFetchError(err)
+    }
+    return response
+}
 const deleteFileVectors = async (fileId) => call('DELETE', `/files/${fileId}`)
 const deleteProjectVectors = async (projectId) => call('DELETE', `/projects/${projectId}`)
 
-module.exports = { indexChunks, searchChunks, askQuestion, deleteFileVectors, deleteProjectVectors }
+module.exports = { indexChunks, searchChunks, askQuestion, deleteFileVectors, deleteProjectVectors,askQuestionStream }
