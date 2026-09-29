@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { askProjectStreamAPI } from '../src/service/allAPI'
+import { askProjectStreamAPI } from '../service/allAPI'
 
 const MAX_HISTORY = 10
 
