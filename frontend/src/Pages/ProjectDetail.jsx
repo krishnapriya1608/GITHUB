@@ -11,6 +11,7 @@ import {
     getIndexStatusAPI
 } from '../service/allAPI'
 import AskChat from '../components/AskChat'
+import ArchitectureOverview from '../components/ArchitectureOverview'
 
 function ProjectDetail() {
     const { id } = useParams()
@@ -437,6 +438,9 @@ function ProjectDetail() {
 
                 {/* Ask the codebase: chat with history + streaming */}
                 <AskChat projectId={id} onOpenSource={openSource} cardClass={cardClass} />
+
+                {/* Deterministic project analysis + optional LLM summary */}
+                <ArchitectureOverview projectId={id} cardClass={cardClass} />
 
                 {/* Semantic search */}
                 <div className={`mb-6 p-6 ${cardClass}`}>
