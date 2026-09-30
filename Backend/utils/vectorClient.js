@@ -53,28 +53,28 @@ const askQuestion = async (projectId, question, topK = 6) => {
 const deleteFileVectors = async (fileId) => call('DELETE', `/files/${fileId}`)
 const deleteProjectVectors = async (projectId) => call('DELETE', `/projects/${projectId}`)
 
-module.exports = { indexChunks, searchChunks, askQuestion, deleteFileVectors, deleteProjectVectors }
-
 // Streams /ask/stream from the AI service and returns the raw Response so the
-// caller can pipe its body straight through (Server-Sent Events pass-through).
-const streamAsk = async (projectId, question, topK = 6) => {
-    let response
+// controller can pipe its body straight through (Server-Sent Events pass-through).
+// It does NOT throw on a non-OK status: the controller checks upstream.ok and reports it.
+// `signal` lets the controller cancel the request (Stop button / closed tab).
+const askQuestionStream = async (projectId, question, topK = 8, history = [], signal) => {
     try {
-        response = await fetch(`${AI_SERVICE_URL}/ask/stream`, {
+        return await fetch(`${AI_SERVICE_URL}/ask-stream`, {   // was /ask/stream
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ project_id: projectId, question, top_k: topK })
+            body: JSON.stringify({
+                project_id: projectId,
+                question,
+                top_k: topK,
+                history
+            }),
+            signal
         })
     } catch (err) {
+        if (err.name === 'AbortError') throw err
         throw explainFetchError(err)
     }
-    if (!response.ok) {
-        throw new Error(`AI service /ask/stream failed (${response.status}): ${await response.text()}`)
-    }
-    return response
 }
-
-module.exports.streamAsk = streamAsk
 
 // Sends the deterministic analysis (tree/endpoints/symbols) to the AI service
 // and gets back a short prose summary. No conversation, no retrieval - this
@@ -97,4 +97,13 @@ const getArchitectureSummary = async ({ projectName, tree, endpoints, symbols })
     return data.summary
 }
 
-module.exports.getArchitectureSummary = getArchitectureSummary
+module.exports = {
+    indexChunks,
+    searchChunks,
+    askQuestion,
+    askQuestionStream,
+    streamAsk: askQuestionStream, // old name kept as an alias
+    deleteFileVectors,
+    deleteProjectVectors,
+    getArchitectureSummary
+}

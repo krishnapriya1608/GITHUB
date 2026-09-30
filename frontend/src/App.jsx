@@ -6,21 +6,15 @@ import ForgotPassword from './Pages/ForgotPassword'
 import ResetPassword from './Pages/ResetPassword'
 import Dashboard from './Pages/Dashboard'
 import ProjectDetail from './Pages/ProjectDetail'
+import Home from './Pages/Home'
 
-function Home() {
-  return (
-    <div className="auth-page">
-      <h1>Welcome</h1>
-      <p>You are logged in.</p>
-    </div>
-  )
-}
 
 function App() {
   return (
     <Routes>
+      <Route path="/" element={<Home />} />
  <Route path="/dash" element={<Dashboard />} />
-       <Route path="/" element={<Register />} />
+       <Route path="/register" element={<Register />} />
       <Route path="/verify-otp" element={<VerifyOTP />} />
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

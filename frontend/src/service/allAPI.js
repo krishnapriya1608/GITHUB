@@ -163,3 +163,4 @@ export const getProjectAnalysisAPI = async (projectId) => {
 export const getProjectSummaryAPI = async (projectId) => {
     return await commonAPI('GET', `${serverURL}/api/${projectId}/files/analysis/summary`, {}, authHeader())
 }
+
