@@ -75,7 +75,7 @@ def _strip_thinking(text: str) -> str:
     return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
 
-def _ask_ollama(user_message: str) -> str:
+def _ask_ollama(user_message: str, system: str = None) -> str:
     try:
         response = requests.post(
             f"{OLLAMA_URL}/api/chat",
@@ -83,7 +83,7 @@ def _ask_ollama(user_message: str) -> str:
                 "model": OLLAMA_MODEL,
                 "stream": False,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system or SYSTEM_PROMPT},
                     {"role": "user", "content": user_message},
                 ],
                 "options": {
@@ -111,7 +111,7 @@ def _ask_ollama(user_message: str) -> str:
     return _strip_thinking(response.json()["message"]["content"])
 
 
-def _ask_gemini(user_message: str) -> str:
+def _ask_gemini(user_message: str, system: str = None) -> str:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError(
@@ -124,7 +124,7 @@ def _ask_gemini(user_message: str) -> str:
             f"{GEMINI_URL}/models/{GEMINI_MODEL}:generateContent",
             headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
             json={
-                "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                "system_instruction": {"parts": [{"text": system or SYSTEM_PROMPT}]},
                 "contents": [{"role": "user", "parts": [{"text": user_message}]}],
                 "generationConfig": {
                     "temperature": 0.2,
@@ -169,7 +169,7 @@ def _ask_gemini(user_message: str) -> str:
     return text.strip()
 
 
-def _ask_anthropic(user_message: str) -> str:
+def _ask_anthropic(user_message: str, system: str = None) -> str:
     if not os.getenv("ANTHROPIC_API_KEY"):
         raise RuntimeError("ANTHROPIC_API_KEY is not set in Python-aiservice/.env")
     from anthropic import Anthropic  # imported lazily so it's optional
@@ -177,7 +177,7 @@ def _ask_anthropic(user_message: str) -> str:
     response = Anthropic().messages.create(
         model=ANTHROPIC_MODEL,
         max_tokens=MAX_ANSWER_TOKENS,
-        system=SYSTEM_PROMPT,
+        system=system or SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
     )
     return "".join(block.text for block in response.content if block.type == "text")
@@ -200,6 +200,64 @@ def answer_question(question: str, results: List[Dict[str, Any]]) -> str:
     if PROVIDER == "anthropic":
         return _ask_anthropic(user_message)
     return _ask_ollama(user_message)
+
+
+# =====================================================================
+# Architecture summary: structured input, one-shot prose output
+# =====================================================================
+MAX_ENDPOINTS_IN_PROMPT = 60
+MAX_SYMBOL_FILES_IN_PROMPT = 40
+
+
+def _render_tree(nodes, indent=0) -> str:
+    lines = []
+    for node in nodes:
+        prefix = "  " * indent + "- "
+        lines.append(f"{prefix}{node['name']}{'/' if node['type'] == 'folder' else ''}")
+        if node["type"] == "folder":
+            lines.append(_render_tree(node["children"], indent + 1))
+    return "\n".join(l for l in lines if l)
+
+
+ARCHITECTURE_SYSTEM_PROMPT = """You write a short, plain-English architecture overview of a software
+project for a new developer joining the team. You are given the project's folder structure, the API
+endpoints found in its code, and the functions/classes found in each file - all detected mechanically,
+not written by you. Base your summary ONLY on this structured data; do not invent files, endpoints, or
+behavior that isn't listed. If something is ambiguous, say so rather than guessing.
+
+Write 3-5 short paragraphs covering: what the project appears to do, its overall structure (e.g.
+frontend/backend split, notable folders), and the main API surface. Plain prose, no markdown headers,
+no bullet-point dump of every single endpoint - summarize the shape of the API instead."""
+
+
+def summarize_architecture(project_name: str, tree, endpoints, symbols) -> str:
+    tree_text = _render_tree(tree) or "(no files)"
+
+    endpoints_text = "\n".join(f"{e['method']} {e['path']}  ({e['file']})" for e in endpoints[:MAX_ENDPOINTS_IN_PROMPT])
+    if len(endpoints) > MAX_ENDPOINTS_IN_PROMPT:
+        endpoints_text += f"\n...and {len(endpoints) - MAX_ENDPOINTS_IN_PROMPT} more"
+    if not endpoints_text:
+        endpoints_text = "(none detected)"
+
+    symbol_lines = []
+    for f in symbols[:MAX_SYMBOL_FILES_IN_PROMPT]:
+        names = ", ".join(s["name"] for s in f["symbols"][:12])
+        location = f"{f['path']}/{f['filename']}" if f.get("path") else f["filename"]
+        symbol_lines.append(f"{location}: {names}")
+    symbols_text = "\n".join(symbol_lines) or "(none detected)"
+
+    user_message = (
+        f"Project name: {project_name}\n\n"
+        f"Folder structure:\n{tree_text}\n\n"
+        f"API endpoints:\n{endpoints_text}\n\n"
+        f"Functions/classes per file:\n{symbols_text}"
+    )
+
+    if PROVIDER == "gemini":
+        return _ask_gemini(user_message, system=ARCHITECTURE_SYSTEM_PROMPT)
+    if PROVIDER == "anthropic":
+        return _ask_anthropic(user_message, system=ARCHITECTURE_SYSTEM_PROMPT)
+    return _ask_ollama(user_message, system=ARCHITECTURE_SYSTEM_PROMPT)
 
 
 # =====================================================================
@@ -401,6 +459,133 @@ def _stream_anthropic(messages):
     ) as stream:
         for text in stream.text_stream:
             yield text
+
+
+# =====================================================================
+# Tool calling (Gemini only): the model can request another search before
+# the final answer is generated, instead of being stuck with a single
+# fixed retrieval pass. Format per Gemini's function-calling API:
+#   - tool result is sent back as role "user" (not "function")
+#   - the model's own function-call turn must be replayed to it VERBATIM
+#     (not reconstructed), since newer models attach a signature to it
+#     that a hand-built copy would silently drop, breaking the next call
+# =====================================================================
+MAX_TOOL_ROUNDS = 3
+
+SEARCH_CODE_TOOL = {
+    "function_declarations": [{
+        "name": "search_code",
+        "description": (
+            "Search this project's codebase for code related to a query, by meaning. "
+            "Call this if the code shown so far doesn't cover what the question is asking about, "
+            "or the question clearly concerns a different part of the codebase."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "What to search for, e.g. \'password reset flow\' or \'database connection setup\'"
+                }
+            },
+            "required": ["query"]
+        }
+    }]
+}
+
+TOOL_SYSTEM_PROMPT = (
+    "You are deciding what code to look at before answering a question about a project. "
+    "You may call search_code to look up additional relevant code. Call it only if what you can "
+    "already see is not enough. Do not call it more than once per turn. If you are ready, reply "
+    "with any short text - it will be discarded, only whether you called the tool matters."
+)
+
+
+def refine_context_with_tools(question: str, initial_results: List[Dict[str, Any]], search_fn) -> List[Dict[str, Any]]:
+    """
+    Gemini-only. search_fn(query: str) -> List[Dict] in the same shape as
+    vectorstore.search()'s results. Returns the original results, possibly
+    extended with extra chunks the model asked for. Never raises: any failure
+    just falls back to the initial results unchanged, since this is a
+    best-effort refinement step, not something the answer should depend on.
+    """
+    if PROVIDER != "gemini":
+        return initial_results
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return initial_results
+
+    results = list(initial_results)
+    seen_ids = {r["chunk_id"] for r in results}
+
+    contents = [{
+        "role": "user",
+        "parts": [{"text": f"Code excerpts found so far:\n\n{_format_context(results)}\n\nQuestion: {question}"}]
+    }]
+
+    for _ in range(MAX_TOOL_ROUNDS):
+        try:
+            response = requests.post(
+                f"{GEMINI_URL}/models/{GEMINI_MODEL}:generateContent",
+                headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                json={
+                    "system_instruction": {"parts": [{"text": TOOL_SYSTEM_PROMPT}]},
+                    "contents": contents,
+                    "tools": [SEARCH_CODE_TOOL],
+                },
+                timeout=GEMINI_TIMEOUT,
+            )
+        except requests.exceptions.RequestException:
+            break
+
+        if not response.ok:
+            break
+
+        candidates = (response.json() or {}).get("candidates") or []
+        if not candidates:
+            break
+
+        model_content = candidates[0].get("content") or {}
+        parts = model_content.get("parts") or []
+        call = next((p["functionCall"] for p in parts if "functionCall" in p), None)
+
+        if not call:
+            break  # model is satisfied with what it already has
+
+        query = (call.get("args") or {}).get("query")
+        if not query or not isinstance(query, str):
+            break
+
+        try:
+            new_results = search_fn(query)
+        except Exception:
+            break
+
+        added = [r for r in new_results if r["chunk_id"] not in seen_ids]
+        seen_ids.update(r["chunk_id"] for r in added)
+        results.extend(added)
+
+        # Replay the model's OWN content block verbatim (may carry a signature
+        # field we must not drop), then send the tool's result as role "user".
+        contents.append(model_content)
+        contents.append({
+            "role": "user",
+            "parts": [{
+                "functionResponse": {
+                    "name": "search_code",
+                    "response": {
+                        "result": f"Found {len(added)} new code excerpt(s) for '{query}'." if added
+                                  else f"No new results for '{query}'."
+                    }
+                }
+            }]
+        })
+
+        if not added:
+            break  # nothing new - no point letting it loop again
+
+    return results
 
 
 def stream_answer(question: str, results: List[Dict[str, Any]], history=None):

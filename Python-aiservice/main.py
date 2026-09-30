@@ -5,7 +5,7 @@ load_dotenv()  # reads Python-aiservice/.env (ANTHROPIC_API_KEY, ANSWER_MODEL)
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Optional
 
 from file_processor import process_file
 from embeddings import embed_texts, get_model
@@ -171,6 +171,16 @@ def ask_stream(payload: AskStreamRequest):
         try:
             query = rag.retrieval_query(payload.question, history)
             results = vectorstore.search(payload.project_id, query, payload.top_k)
+
+            # Gemini only (no-op otherwise): let the model request another search
+            # before we commit to a source list, since citation numbers below
+            # have to match whatever we actually show the model.
+            results = rag.refine_context_with_tools(
+                payload.question,
+                results,
+                lambda q: vectorstore.search(payload.project_id, q, payload.top_k),
+            )
+
             sources = [{"number": i, **r} for i, r in enumerate(results, start=1)]
             yield _sse({"type": "sources", "sources": sources})
 
@@ -187,6 +197,55 @@ def ask_stream(payload: AskStreamRequest):
     )
 
 # ---------------- DIAGNOSTICS ----------------
+class TreeNode(BaseModel):
+    name: str
+    type: str
+    language: Optional[str] = None
+    size: Optional[int] = None
+    children: Optional[List["TreeNode"]] = None
+
+TreeNode.model_rebuild()
+
+
+class EndpointIn(BaseModel):
+    method: str
+    path: str
+    file: str
+
+
+class SymbolFileIn(BaseModel):
+    filename: str
+    path: str = ""
+    symbols: List[Dict[str, str]]
+
+
+class ArchitectureSummaryRequest(BaseModel):
+    project_name: str
+    tree: List[TreeNode]
+    endpoints: List[EndpointIn]
+    symbols: List[SymbolFileIn]
+
+
+@app.post("/architecture-summary")
+async def architecture_summary(payload: ArchitectureSummaryRequest):
+    """
+    One-shot prose summary over the deterministic analysis the Node backend
+    already computed (folder tree, detected endpoints, detected functions/classes).
+    No retrieval, no conversation - just structured input in, prose out.
+    """
+    try:
+        summary = rag.summarize_architecture(
+            payload.project_name,
+            [n.model_dump() for n in payload.tree],
+            [e.model_dump() for e in payload.endpoints],
+            [s.model_dump() for s in payload.symbols],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Summary generation failed: {e}")
+
+    return {"summary": summary}
+
+
 @app.get("/stats")
 async def stats(project_id: str = None, depth: int = 3):
     """Open http://127.0.0.1:8000/stats?project_id=<id> to see what is indexed, by folder."""

@@ -49,23 +49,52 @@ const searchChunks = async (projectId, query, topK = 5) => {
 const askQuestion = async (projectId, question, topK = 6) => {
     return call('POST', '/ask', { project_id: projectId, question, top_k: topK })
 }
-// Streaming variant: returns the raw fetch Response so the controller can pipe the SSE body through
-const askQuestionStream = async (projectId, question, topK, history, signal) => {
-    let response
-    try {
-        response = await fetch(`${AI_SERVICE_URL}/ask-stream`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ project_id: projectId, question, top_k: topK, history }),
-            signal
-        })
-    } catch (err) {
-        if (err.name === 'AbortError') throw err
-        throw explainFetchError(err)
-    }
-    return response
-}
+
 const deleteFileVectors = async (fileId) => call('DELETE', `/files/${fileId}`)
 const deleteProjectVectors = async (projectId) => call('DELETE', `/projects/${projectId}`)
 
-module.exports = { indexChunks, searchChunks, askQuestion, deleteFileVectors, deleteProjectVectors,askQuestionStream }
+module.exports = { indexChunks, searchChunks, askQuestion, deleteFileVectors, deleteProjectVectors }
+
+// Streams /ask/stream from the AI service and returns the raw Response so the
+// caller can pipe its body straight through (Server-Sent Events pass-through).
+const streamAsk = async (projectId, question, topK = 6) => {
+    let response
+    try {
+        response = await fetch(`${AI_SERVICE_URL}/ask/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_id: projectId, question, top_k: topK })
+        })
+    } catch (err) {
+        throw explainFetchError(err)
+    }
+    if (!response.ok) {
+        throw new Error(`AI service /ask/stream failed (${response.status}): ${await response.text()}`)
+    }
+    return response
+}
+
+module.exports.streamAsk = streamAsk
+
+// Sends the deterministic analysis (tree/endpoints/symbols) to the AI service
+// and gets back a short prose summary. No conversation, no retrieval - this
+// is a one-shot structured-input -> structured-output call.
+const getArchitectureSummary = async ({ projectName, tree, endpoints, symbols }) => {
+    let response
+    try {
+        response = await fetch(`${AI_SERVICE_URL}/architecture-summary`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_name: projectName, tree, endpoints, symbols })
+        })
+    } catch (err) {
+        throw explainFetchError(err)
+    }
+    if (!response.ok) {
+        throw new Error(`AI service /architecture-summary failed (${response.status}): ${await response.text()}`)
+    }
+    const data = await response.json()
+    return data.summary
+}
+
+module.exports.getArchitectureSummary = getArchitectureSummary

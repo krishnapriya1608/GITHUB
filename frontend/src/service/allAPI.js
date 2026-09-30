@@ -155,3 +155,11 @@ export const getChatHistoryAPI = async (projectId) => {
 export const clearChatHistoryAPI = async (projectId) => {
     return await commonAPI('DELETE', `${serverURL}/api/${projectId}/files/messages`, {}, authHeader())
 }
+// Add these to the bottom of frontend/src/service/allAPI.js
+export const getProjectAnalysisAPI = async (projectId) => {
+    return await commonAPI('GET', `${serverURL}/api/${projectId}/files/analysis`, {}, authHeader())
+}
+
+export const getProjectSummaryAPI = async (projectId) => {
+    return await commonAPI('GET', `${serverURL}/api/${projectId}/files/analysis/summary`, {}, authHeader())
+}

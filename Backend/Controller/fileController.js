@@ -4,8 +4,9 @@ const File = require('../Schema/fileSchema')
 const Chunk = require('../Schema/chunkSchema')
 const { classifyFile, findIgnoredSegment, getExtension, EXTENSION_MAP } = require('../utils/fileClassifier')
 const { startIndexJob, getJob, isRunning } = require('../utils/indexJobs')
-const ChatMessage = require('../Schema/chatmessageschema')
-const { searchChunks, askQuestion, askQuestionStream, deleteFileVectors, deleteProjectVectors } = require('../utils/vectorClient')
+const ChatMessage = require('../Schema/chatMessageSchema')
+const { buildFileTree, detectEndpoints, detectSymbols } = require('../utils/codeAnalyzer')
+const { searchChunks, askQuestion, askQuestionStream, deleteFileVectors, deleteProjectVectors, getArchitectureSummary } = require('../utils/vectorClient')
 const MAX_ENTRIES = 2000            // guard against zip bombs — counts relevant files only, after filtering
 const MAX_FILE_CONTENT_BYTES = 200 * 1024 // truncate any single file's stored content at 200KB
 
@@ -488,5 +489,73 @@ exports.clearChatHistory = async (req, res) => {
     catch (err) {
         console.log(err.message)
         return res.status(500).json({ message: "Internal server error" })
+    }
+}
+
+
+// ---------------- PROJECT ANALYSIS (deterministic, no LLM) ----------------
+// Folder tree, detected API endpoints, and detected functions/classes, built
+// straight from the files already stored - always accurate, instant, and free.
+exports.getProjectAnalysis = async (req, res) => {
+    console.log("Inside get project analysis")
+    try {
+        const { projectId } = req.params
+
+        const project = await findOwnedProject(projectId, req.user.id)
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" })
+        }
+
+        const files = await File.find({ project: projectId })
+        if (files.length === 0) {
+            return res.status(400).json({ message: "This project has no files yet" })
+        }
+
+        const tree = buildFileTree(files)
+        const endpoints = detectEndpoints(files)
+        const symbols = detectSymbols(files)
+
+        res.status(200).json({
+            message: "Analysis complete",
+            fileCount: files.length,
+            tree,
+            endpoints,
+            symbols
+        })
+    }
+    catch (err) {
+        console.log(err.message)
+        return res.status(500).json({ message: "Internal server error" })
+    }
+}
+
+// ---------------- PROJECT ANALYSIS SUMMARY (LLM-written, optional) ----------------
+// A short prose overview on top of the deterministic analysis above. Separate
+// endpoint so the fast, reliable analysis never depends on the AI service.
+exports.getProjectSummary = async (req, res) => {
+    console.log("Inside get project summary")
+    try {
+        const { projectId } = req.params
+
+        const project = await findOwnedProject(projectId, req.user.id)
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" })
+        }
+
+        const files = await File.find({ project: projectId })
+        if (files.length === 0) {
+            return res.status(400).json({ message: "This project has no files yet" })
+        }
+
+        const tree = buildFileTree(files)
+        const endpoints = detectEndpoints(files)
+        const symbols = detectSymbols(files)
+
+        const summary = await getArchitectureSummary({ projectName: project.name, tree, endpoints, symbols })
+        res.status(200).json({ message: "Summary generated", summary })
+    }
+    catch (err) {
+        console.log(err.message)
+        return res.status(500).json({ message: "Could not generate summary: " + err.message })
     }
 }
