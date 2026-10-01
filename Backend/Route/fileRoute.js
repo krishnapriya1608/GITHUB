@@ -20,5 +20,6 @@ router.get('/', fileController.getProjectFiles)
 router.get('/index-status', fileController.getIndexStatus)
 router.get('/:fileId', fileController.getFileById)
 router.delete('/:fileId', fileController.deleteFile)
+router.post('/import-github', fileController.importFromGithub)
 
 module.exports = router

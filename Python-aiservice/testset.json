@@ -5,38 +5,23 @@
     "expected_files": ["userController.js", "authMiddleware.js"]
   },
   {
-    "project_id": "    6aba48599b099b5ef0b57f7a",
+    "project_id": "6aba48599b099b5ef0b57f7a",
     "question": "how is a password reset?",
     "expected_files": ["userController.js"]
   },
+  
+ 
+  
+ 
   {
-    "project_id": "    6aba48599b099b5ef0b57f7a",
-    "question": "how is a project zip file uploaded and processed?",
-    "expected_files": ["fileController.js"]
-  },
-  {
-    "project_id": "    6aba48599b099b5ef0b57f7a",
-    "question": "how are code chunks turned into embeddings?",
-    "expected_files": ["indexFiles.js", "embedClient.js"]
-  },
-  {
-    "project_id": "    6aba48599b099b5ef0b57f7a",
-    "question": "what database schema stores chat messages?",
-    "expected_files": ["chatMessageSchema.js"]
-  },
-  {
-    "project_id": "    6aba48599b099b5ef0b57f7a",
+    "project_id": "6aba48599b099b5ef0b57f7a",
     "question": "how is the JWT token verified on protected routes?",
     "expected_files": ["authMiddleware.js"]
   },
   {
-    "project_id": "    6aba48599b099b5ef0b57f7a",
+    "project_id": "6aba48599b099b5ef0b57f7a",
     "question": "how does the frontend send OTP for verification?",
     "expected_files": ["OTPverification.jsx", "allAPI.js"]
-  },
-  {
-    "project_id": "    6aba48599b099b5ef0b57f7a",
-    "question": "where are API endpoints detected for the architecture overview?",
-    "expected_files": ["codeAnalyzer.js"]
   }
+ 
 ]

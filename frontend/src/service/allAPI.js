@@ -164,3 +164,6 @@ export const getProjectSummaryAPI = async (projectId) => {
     return await commonAPI('GET', `${serverURL}/api/${projectId}/files/analysis/summary`, {}, authHeader())
 }
 
+export const importGithubAPI = async (projectId, url) => {
+    return await commonAPI('POST', `${serverURL}/api/${projectId}/files/import-github`, { url }, authHeader())
+}

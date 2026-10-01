@@ -1,0 +1,62 @@
+{
+  "hybrid": {
+    "total_questions": 4,
+    "recall_at_1": 0.25,
+    "recall_at_5": 0.5,
+    "mean_reciprocal_rank": 0.333,
+    "details": [
+      {
+        "question": "how does login work?",
+        "expected": [
+          "authmiddleware.js",
+          "usercontroller.js"
+        ],
+        "found_at_rank": null,
+        "top_results": []
+      },
+      {
+        "question": "how is a password reset?",
+        "expected": [
+          "usercontroller.js"
+        ],
+        "found_at_rank": null,
+        "top_results": [
+          "auth.jsx",
+          "auth.jsx",
+          "sendmail.js",
+          "otpverification.jsx",
+          "authroutes.js"
+        ]
+      },
+      {
+        "question": "how is the JWT token verified on protected routes?",
+        "expected": [
+          "authmiddleware.js"
+        ],
+        "found_at_rank": 3,
+        "top_results": [
+          "authroutes_oldd.js",
+          "authroutes.js",
+          "authmiddleware.js",
+          "authmiddleware.js",
+          "otpverification.jsx"
+        ]
+      },
+      {
+        "question": "how does the frontend send OTP for verification?",
+        "expected": [
+          "allapi.js",
+          "otpverification.jsx"
+        ],
+        "found_at_rank": 1,
+        "top_results": [
+          "otpverification.jsx",
+          "otpverification.jsx",
+          "authroutes.js",
+          "auth.jsx",
+          "authroutes_oldd.js"
+        ]
+      }
+    ]
+  }
+}

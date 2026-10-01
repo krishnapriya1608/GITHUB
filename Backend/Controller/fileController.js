@@ -9,15 +9,14 @@ const { buildFileTree, detectEndpoints, detectSymbols } = require('../utils/code
 const { searchChunks, askQuestion, askQuestionStream, deleteFileVectors, deleteProjectVectors, getArchitectureSummary } = require('../utils/vectorClient')
 const MAX_ENTRIES = 2000            // guard against zip bombs — counts relevant files only, after filtering
 const MAX_FILE_CONTENT_BYTES = 200 * 1024 // truncate any single file's stored content at 200KB
-
+const { downloadRepoZip, ImportError } = require('../utils/githubImport')
 // A project only belongs to the logged-in user if owner matches
 const findOwnedProject = async (projectId, userId) => {
     return Project.findOne({ _id: projectId, owner: userId })
 }
 
 // ---------------- UPLOAD + EXTRACT ZIP ----------------
-exports.uploadProjectZip = async (req, res) => {
-    console.log("Inside upload project zip")
+const importZip = async (req, res, loadBuffer, { stripTopFolder = false } = {}) => {
     try {
         const { projectId } = req.params
 
@@ -26,13 +25,17 @@ exports.uploadProjectZip = async (req, res) => {
             return res.status(404).json({ message: "Project not found" })
         }
 
-        if (!req.file) {
-            return res.status(400).json({ message: "No zip file uploaded" })
+        let buffer
+        try {
+            buffer = await loadBuffer()
+        } catch (err) {
+            if (err.status) return res.status(err.status).json({ message: err.message })
+            throw err
         }
 
         let zip
         try {
-            zip = new AdmZip(req.file.buffer)
+            zip = new AdmZip(buffer)
         } catch (err) {
             return res.status(400).json({ message: "Uploaded file is not a valid zip archive" })
         }
@@ -51,8 +54,9 @@ exports.uploadProjectZip = async (req, res) => {
         for (const entry of entries) {
             if (entry.isDirectory) continue
 
-            const entryName = entry.entryName // e.g. "src/components/App.jsx"
-
+            let entryName = entry.entryName 
+            if (stripTopFolder) entryName = entryName.split('/').slice(1).join('/')
+            if (!entryName) continue
             // guard against zip-slip style paths, just in case
             if (entryName.includes('..')) {
                 skippedCount++
@@ -160,6 +164,21 @@ exports.uploadProjectZip = async (req, res) => {
         console.log(err.message)
         return res.status(500).json({ message: "Internal server error" })
     }
+}
+
+// ---------------- UPLOAD + EXTRACT ZIP ----------------
+exports.uploadProjectZip = (req, res) => {
+    console.log("Inside upload project zip")
+    return importZip(req, res, async () => {
+        if (!req.file) throw new ImportError(400, "No zip file uploaded")
+        return req.file.buffer
+    })
+}
+
+// ---------------- IMPORT FROM GITHUB URL ----------------
+exports.importFromGithub = (req, res) => {
+    console.log("Inside import from GitHub")
+    return importZip(req, res, () => downloadRepoZip(req.body?.url), { stripTopFolder: true })
 }
 
 // ---------------- LIST FILES FOR A PROJECT ----------------
