@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
-// import Logo from "../components/Logo";
+import Footer from '../components/Footer'
 
 const PANEL = "relative overflow-hidden rounded-sm bg-[#0a0a0a] border border-white/5 shadow-inner";
 const CHIP = "inline-flex items-center rounded-sm border border-current bg-transparent px-3 py-1 text-[10px] font-medium tracking-wider uppercase";
@@ -87,7 +87,7 @@ const FAQS = [
   }
 ];
 
-function CodebaseLanding() {
+function Home() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState(null);
 
@@ -252,14 +252,14 @@ function CodebaseLanding() {
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
                 <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></span>
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500/80"></span>
-                <span className="ml-2">terminal@cosmos-engine:~</span>
+                <span className="ml-2">terminal@codebase-engine:~</span>
               </span>
               <span>INDEX: ONLINE</span>
             </div>
 
             <div className="space-y-2 pt-2">
               <div className="text-neutral-400">
-                <span className="text-emerald-400">$</span> cosmos search --query <span className="text-amber-300">"Where is token validation defined?"</span>
+                <span className="text-emerald-400">$</span> codebase search --query <span className="text-amber-300">"Where is token validation defined?"</span>
               </div>
               <div className="text-neutral-500 text-[11px] pl-4 border-l-2 border-amber-400/30 py-1 space-y-1">
                 <p className="text-white font-semibold">Matched 2 source citations:</p>
@@ -321,18 +321,11 @@ function CodebaseLanding() {
 
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 w-full px-8 py-6 flex flex-wrap items-center justify-between text-[10px] text-neutral-500 border-t border-white/5 bg-black font-mono">
-        <div className="flex items-center space-x-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-          <span>NETWORK: OPERATIONAL</span>
-        </div>
-        <div>
-          Codebase Intelligence provided by <span className="font-semibold text-neutral-300">COSMOS® ENGINE</span>
-        </div>
-      </footer>
+    
+
+      <Footer/>
     </div>
   );
 }
 
-export default CodebaseLanding;
+export default Home;

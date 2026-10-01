@@ -33,22 +33,22 @@ function Footer() {
             <ul className="space-y-2 text-xs">
               <li>
                 <a href="#features" className="transition hover:text-emerald-400">
-                  // Architecture Features
+                   Architecture Features
                 </a>
               </li>
               <li>
                 <a href="#projects" className="transition hover:text-emerald-400">
-                  // Active Repositories
+                   Active Repositories
                 </a>
               </li>
               <li>
                 <a href="#docs" className="transition hover:text-emerald-400">
-                  // API Specifications
+                   API Specifications
                 </a>
               </li>
               <li>
                 <a href="#status" className="transition hover:text-emerald-400">
-                  // System Metrics
+                   System Metrics
                 </a>
               </li>
             </ul>

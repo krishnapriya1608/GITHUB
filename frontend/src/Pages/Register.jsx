@@ -21,17 +21,17 @@ function Register() {
 
     useEffect(() => {
         const ctx = gsap.context(() => {
-            // 1. Glowing background pulse animation
+            // Glowing background pulse animation
             gsap.to(glowRef.current, {
                 scale: 1.25,
-                opacity: 0.25,
+                opacity: 0.35,
                 duration: 4,
                 repeat: -1,
                 yoyo: true,
                 ease: "sine.inOut"
             })
 
-            // 2. Timeline for smooth staggered entrance
+            // Timeline for smooth staggered entrance
             const tl = gsap.timeline({ defaults: { ease: "power3.out" } })
 
             tl.fromTo(headerRef.current, 
@@ -50,12 +50,12 @@ function Register() {
             )
             .fromTo(formFieldsRef.current, 
                 { y: 20, opacity: 0 }, 
-                { y: 0, opacity: 1, duration: 0.5, stagger: 0.1 }, 
+                { y: 0, opacity: 1, duration: 0.5, stagger: 0.08 }, 
                 "-=0.4"
             )
         })
 
-        return () => ctx.revert() // Cleanup GSAP animations on unmount
+        return () => ctx.revert()
     }, [])
 
     const handleChange = (e) => {
@@ -89,19 +89,21 @@ function Register() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0d0c11] text-white font-sans flex flex-col justify-between relative overflow-hidden">
-            {/* Background Purple Glow Effects */}
+        <div className="min-h-screen bg-[#09080e] text-white font-sans flex flex-col justify-between relative overflow-hidden selection:bg-[#9181c4]/30 selection:text-white">
+            
+            {/* Ambient Background Glows */}
             <div 
                 ref={glowRef}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#8a72cf]/15 blur-[140px] rounded-full pointer-events-none" 
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[650px] bg-[#7c5cdb]/20 blur-[150px] rounded-full pointer-events-none" 
             />
+            <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#4c3882]/20 blur-[120px] rounded-full pointer-events-none" />
 
             {/* Navigation Header */}
             <header ref={headerRef} className="relative z-10 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full">
-                <div style={{ fontFamily: "Arima, system-ui" }} className="font-bold text-xl tracking-wider text-white">
-                    COSMOS®
+                <div style={{ fontFamily: "Arima, system-ui" }} className="font-black text-2xl tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-100 to-purple-400">
+                    Codebase®
                 </div>
-                <nav style={{ fontFamily: "Arima, system-ui" }} className="flex items-center space-x-8 text-sm text-gray-300">
+                <nav style={{ fontFamily: "Arima, system-ui" }} className="flex items-center space-x-8 text-sm font-medium text-gray-300">
                     <Link to="/" className="hover:text-white transition-colors">Home</Link>
                     <a href="#features" className="hover:text-white transition-colors">Features</a>
                     <a href="#team" className="hover:text-white transition-colors">Team</a>
@@ -114,19 +116,25 @@ function Register() {
                     
                     {/* Left Column: Heading & Social Login */}
                     <div ref={leftColRef} className="lg:col-span-6 space-y-6">
-                        <h1 style={{ fontFamily: "Arima, system-ui" }} className="text-5xl font-black tracking-tight text-white uppercase">
-                            REGISTER
-                        </h1>
-                        <p style={{ fontFamily: "Arima, system-ui" }} className="text-gray-400 text-sm leading-relaxed max-w-sm">
+                        <div className="space-y-2">
+                            <span style={{ fontFamily: "Arima, system-ui" }} className="text-xs font-semibold tracking-widest text-[#a895e2] uppercase">
+                                Get Started Free
+                            </span>
+                            <h1 style={{ fontFamily: "Arima, system-ui" }} className="text-5xl lg:text-6xl font-black tracking-tight text-white uppercase leading-none">
+                                REGISTER
+                            </h1>
+                        </div>
+
+                        <p style={{ fontFamily: "Arima, system-ui" }} className="text-gray-400 text-base leading-relaxed max-w-sm">
                             Hey, welcome! <br />
-                            Create your account to get started with us today.
+                            Create your account to unlock full access and get started with us today.
                         </p>
 
                         <div className="pt-2">
                             <button
-                            style={{ fontFamily: "Arima, system-ui" }}
+                                style={{ fontFamily: "Arima, system-ui" }}
                                 type="button"
-                                className="flex items-center justify-center space-x-3 w-full sm:w-auto px-6 py-3 rounded-full border border-gray-700/80 bg-black/40 hover:bg-black/60 text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                                className="flex items-center justify-center space-x-3 w-full sm:w-auto px-7 py-3.5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-medium text-gray-200 transition-all duration-300 backdrop-blur-md hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-black/20"
                             >
                                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                                     <path
@@ -146,13 +154,13 @@ function Register() {
                                         d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.1-6.4-5.2L1.9 16C3.7 19.7 7.5 22.3 12 23z"
                                     />
                                 </svg>
-                                <span>Register with google</span>
+                                <span>Register with Google</span>
                             </button>
                         </div>
 
-                        <p style={{ fontFamily: "Arima, system-ui" }} className="text-gray-400 text-sm pt-4">
+                        <p style={{ fontFamily: "Arima, system-ui" }} className="text-gray-400 text-sm pt-2">
                             Already a member?{" "}
-                            <Link style={{ fontFamily: "Arima, system-ui" }} to="/login" className="font-bold text-white hover:underline ml-1">
+                            <Link style={{ fontFamily: "Arima, system-ui" }} to="/login" className="font-semibold text-purple-300 hover:text-white hover:underline transition-colors ml-1">
                                 Sign In
                             </Link>
                         </p>
@@ -162,12 +170,13 @@ function Register() {
                     <div className="lg:col-span-6 flex justify-center lg:justify-end">
                         <div 
                             ref={cardRef} 
-                            className="w-full max-w-md p-8 rounded-3xl bg-[#282436]/40 backdrop-blur-xl border border-[#9181c4]/30 shadow-2xl space-y-5"
+                            className="w-full max-w-md p-8 rounded-3xl bg-[#1a1726]/60 backdrop-blur-2xl border border-[#a895e2]/20 shadow-[0_20px_50px_rgba(0,0,0,0.5)] space-y-6"
                         >
                             <form style={{ fontFamily: "Arima, system-ui" }} onSubmit={handleRegister} className="space-y-4">
+                                
                                 {/* Name Input */}
                                 <div ref={(el) => (formFieldsRef.current[0] = el)} className="space-y-1.5">
-                                    <label className="text-xs font-medium text-gray-300 tracking-wide">
+                                    <label className="text-xs font-semibold text-gray-300 tracking-wider uppercase">
                                         Full Name
                                     </label>
                                     <input
@@ -176,14 +185,14 @@ function Register() {
                                         placeholder="E.g. John Doe"
                                         value={data.name}
                                         onChange={handleChange}
-                                        className="w-full px-4 py-3 rounded-2xl bg-[#3f3a52]/50 border border-transparent focus:border-[#9181c4]/60 text-sm text-white placeholder-gray-400 outline-none transition-all"
+                                        className="w-full px-4 py-3.5 rounded-2xl bg-[#2a243a]/60 border border-white/5 focus:border-[#a895e2]/60 focus:bg-[#2a243a]/90 text-sm text-white placeholder-gray-500 outline-none transition-all duration-200 shadow-inner"
                                     />
                                 </div>
 
                                 {/* Email Input */}
                                 <div ref={(el) => (formFieldsRef.current[1] = el)} className="space-y-1.5">
-                                    <label className="text-xs font-medium text-gray-300 tracking-wide">
-                                        E-Mail
+                                    <label className="text-xs font-semibold text-gray-300 tracking-wider uppercase">
+                                        E-Mail Address
                                     </label>
                                     <input
                                         type="email"
@@ -191,13 +200,13 @@ function Register() {
                                         placeholder="E.g. coursecrates@gmail.com"
                                         value={data.email}
                                         onChange={handleChange}
-                                        className="w-full px-4 py-3 rounded-2xl bg-[#3f3a52]/50 border border-transparent focus:border-[#9181c4]/60 text-sm text-white placeholder-gray-400 outline-none transition-all"
+                                        className="w-full px-4 py-3.5 rounded-2xl bg-[#2a243a]/60 border border-white/5 focus:border-[#a895e2]/60 focus:bg-[#2a243a]/90 text-sm text-white placeholder-gray-500 outline-none transition-all duration-200 shadow-inner"
                                     />
                                 </div>
 
                                 {/* Password Input */}
                                 <div ref={(el) => (formFieldsRef.current[2] = el)} className="space-y-1.5">
-                                    <label className="text-xs font-medium text-gray-300 tracking-wide">
+                                    <label className="text-xs font-semibold text-gray-300 tracking-wider uppercase">
                                         Password
                                     </label>
                                     <input
@@ -206,17 +215,17 @@ function Register() {
                                         placeholder="••••••••••••"
                                         value={data.password}
                                         onChange={handleChange}
-                                        className="w-full px-4 py-3 rounded-2xl bg-[#3f3a52]/50 border border-transparent focus:border-[#9181c4]/60 text-sm text-white placeholder-gray-400 outline-none transition-all"
+                                        className="w-full px-4 py-3.5 rounded-2xl bg-[#2a243a]/60 border border-white/5 focus:border-[#a895e2]/60 focus:bg-[#2a243a]/90 text-sm text-white placeholder-gray-500 outline-none transition-all duration-200 shadow-inner"
                                     />
                                 </div>
 
                                 {/* Submit Button */}
-                                <div ref={(el) => (formFieldsRef.current[3] = el)}>
+                                <div ref={(el) => (formFieldsRef.current[3] = el)} className="pt-2">
                                     <button
                                         type="submit"
-                                        className="w-full py-3.5 mt-2 rounded-2xl bg-[#8a86a4] hover:bg-[#7b71ba] text-white font-bold text-xs uppercase tracking-wider transition-all duration-200 shadow-lg shadow-[#8c82cb]/20 active:scale-[0.98]"
+                                        className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#8a72cf] to-[#6d52b8] hover:from-[#9881db] hover:to-[#795dc7] text-white font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-lg shadow-[#7c5cdb]/30 active:scale-[0.98] border border-white/10"
                                     >
-                                        REGISTER
+                                        Register Now
                                     </button>
                                 </div>
                             </form>
@@ -227,13 +236,13 @@ function Register() {
             </main>
 
             {/* Footer Bar */}
-            <footer className="relative z-10 w-full px-8 py-4 flex items-center justify-between text-[10px] text-gray-600 border-t border-white/5">
+            <footer className="relative z-10 w-full px-8 py-5 flex items-center justify-between text-xs text-gray-500 border-t border-white/5 backdrop-blur-sm">
                 <div className="flex items-center space-x-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
-                    <span>Cosmos</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                    <span className="font-medium text-gray-400">Codebase Platform</span>
                 </div>
                 <div>
-                    copyright <span className="font-semibold text-gray-400">@ 2026</span>
+                    Copyright <span className="font-medium text-gray-400">© 2026</span>
                 </div>
             </footer>
         </div>

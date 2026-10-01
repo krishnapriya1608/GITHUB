@@ -101,7 +101,7 @@ function VerifyOTP() {
             {/* Navigation Header */}
             <header ref={headerRef} className="relative z-10 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full">
                 <div style={{ fontFamily: "Arima, system-ui" }} className="font-bold text-xl tracking-wider text-white">
-                    COSMOS®
+                    Codebase®
                 </div>
                 <nav className="flex items-center space-x-8 text-sm text-gray-300">
                     <Link to="/" className="hover:text-white transition-colors">Home</Link>
@@ -171,7 +171,7 @@ function VerifyOTP() {
             <footer className="relative z-10 w-full px-8 py-4 flex items-center justify-between text-[10px] text-gray-600 border-t border-white/5">
                 <div className="flex items-center space-x-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
-                    <span>Cosmos</span>
+                    <span>Codebase</span>
                 </div>
                 <div>
                     copyright <span className="font-semibold text-gray-400">@ 2026</span>

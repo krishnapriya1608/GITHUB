@@ -44,7 +44,7 @@ function Login() {
                {/* Top Navigation Brand */}
             <header className="relative z-10 px-8 py-6 max-w-7xl w-full">
                 <div className="font-bold text-xs tracking-[0.3em] uppercase text-gray-300">
-                    COSMOS<span className="text-[9px] align-top">®</span>
+                    Codebase<span className="text-[9px] align-top">®</span>
                 </div>
             </header>
 
