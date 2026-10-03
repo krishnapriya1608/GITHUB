@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import {
     getProjectByIdAPI,
     uploadProjectZipAPI,
+    importGithubAPI,
     getProjectFilesAPI,
     getFileByIdAPI,
     deleteFileAPI,
@@ -79,6 +80,9 @@ function ProjectDetail() {
     const { id } = useParams()
     const navigate = useNavigate()
     const fileInputRef = useRef(null)
+    const [githubModalOpen, setGithubModalOpen] = useState(false)
+    const [githubUrl, setGithubUrl] = useState("")
+    const [importing, setImporting] = useState(false)
 
     const [project, setProject] = useState(null)
     const [files, setFiles] = useState([])
@@ -206,6 +210,38 @@ function ProjectDetail() {
         }
         finally {
             setUploading(false)
+        }
+    }
+
+    const handleImportGithub = async (e) => {
+        e.preventDefault()
+        if (!githubUrl.trim()) return
+
+        setImporting(true)
+        setUploadStatus(null)
+        try {
+            const res = await importGithubAPI(id, githubUrl.trim())
+            if (res.status === 201) {
+                setUploadStatus({
+                    ok: true,
+                    filesStored: res.data.filesStored,
+                    filesSkipped: res.data.filesSkipped,
+                    summary: res.data.summary
+                })
+                setIndexStatus({ state: "indexing", done: 0, total: 0 })
+                setGithubModalOpen(false)
+                setGithubUrl("")
+                loadFiles()
+            } else {
+                setUploadStatus({ ok: false, message: res.data?.message || "Import failed" })
+            }
+        }
+        catch (err) {
+            console.log(err.message)
+            setUploadStatus({ ok: false, message: "Something went wrong while importing from GitHub." })
+        }
+        finally {
+            setImporting(false)
         }
     }
 
@@ -375,8 +411,62 @@ function ProjectDetail() {
                         >
                             {uploading ? "Uploading…" : "Upload .zip"}
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setGithubModalOpen(true)}
+                            className={PILL_BTN}
+                        >
+                            Import from GitHub
+                        </button>
                     </div>
                 </div>
+
+                {/* Import from GitHub modal */}
+                {githubModalOpen && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+                        onClick={() => !importing && setGithubModalOpen(false)}
+                    >
+                        <div
+                            className={`${CARD} w-full max-w-md p-6`}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h3 className="text-sm font-medium text-white">Import from GitHub</h3>
+                            <p className="mt-1 text-xs leading-relaxed text-neutral-400">
+                                Paste a public repo URL. It's cloned, filtered, and indexed the same way a .zip upload is.
+                            </p>
+                            <form onSubmit={handleImportGithub} className="mt-4">
+                                <input
+                                    type="text"
+                                    value={githubUrl}
+                                    onChange={(e) => setGithubUrl(e.target.value)}
+                                    placeholder="https://github.com/owner/repo"
+                                    autoFocus
+                                    disabled={importing}
+                                    className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white
+                                               placeholder-neutral-600 outline-none focus:border-white/25 disabled:opacity-50"
+                                />
+                                <div className="mt-4 flex justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setGithubModalOpen(false)}
+                                        disabled={importing}
+                                        className={`${PILL_BTN} disabled:opacity-50`}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={importing || !githubUrl.trim()}
+                                        className={`${PRIMARY_BTN} disabled:cursor-not-allowed disabled:opacity-60`}
+                                    >
+                                        {importing ? "Importing…" : "Import"}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
 
                 {/* Upload status banner */}
                 {uploadStatus && (

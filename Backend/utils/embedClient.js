@@ -1,8 +1,4 @@
-// Talks to Python-aiservice's /embed endpoint.
-// Requires Node 18+ (global fetch).
 
-// 127.0.0.1 (not "localhost"): on some Node versions "localhost" resolves to IPv6 (::1)
-// while uvicorn listens on IPv4 only, which shows up as a bare "fetch failed".
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000'
 const EMBED_BATCH_SIZE = 128 // chunks per request: keeps bodies small and lets us log progress
 
