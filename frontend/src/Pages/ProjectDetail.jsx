@@ -29,6 +29,21 @@ const PILL_BTN =
 const PRIMARY_BTN =
     "rounded-full border border-amber-400/40 bg-amber-400/10 px-4 py-2 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-50"
 
+const handleDeleteZip = async (source) => {
+    if (!window.confirm(`Delete "${source}" and all its files? This cannot be undone.`)) return
+    try {
+        const res = await deleteSourceAPI(id, source)
+        if (res.status === 200) {
+            setUploadStatus({ ok: true, kind: "reindex", filesStored: 0, message: `Removed ${res.data.removed} file(s)` })
+            loadFiles()
+        } else {
+            alert(res.data?.message || "Could not delete zip")
+        }
+    } catch (err) {
+        console.log(err.message)
+        alert("Something went wrong while deleting the zip.")
+    }
+}
 function CardFooter({ title, text, children }) {
     return (
         <div className="flex items-end justify-between gap-4 px-3 pb-2 pt-4">
@@ -111,6 +126,8 @@ function ProjectDetail() {
             highlightRef.current.scrollIntoView({ block: "center" })
         }
     }, [selectedFile, highlight])
+    const sources = [...new Set(files.map(f => f.source).filter(Boolean))]
+
 
     const fetchIndexStatus = async () => {
         try {
@@ -399,6 +416,18 @@ function ProjectDetail() {
                         </button>
                     </div>
                 </div>
+
+                {sources.map(source => (
+                    <div key={source} className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-sm">
+                        <span className="text-white">{source}.zip</span>
+                        <button
+                            onClick={() => handleDeleteZip(source)}
+                            className="text-red-400 hover:text-red-300"
+                        >
+                            Delete zip
+                        </button>
+                    </div>
+                ))}
 
                 {/* Import from GitHub modal */}
                 {githubModalOpen && (

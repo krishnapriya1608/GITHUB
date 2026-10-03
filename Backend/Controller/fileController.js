@@ -16,151 +16,120 @@ const findOwnedProject = async (projectId, userId) => {
 }
 
 // ---------------- UPLOAD + EXTRACT ZIP ----------------
-const importZip = async (req, res, loadBuffer, { stripTopFolder = false } = {}) => {
+
+const extractZip = (buffer, projectId, { stripTopFolder = false, source = "" } = {}) => {
+    let zip
+    try {
+        zip = new AdmZip(buffer)
+    } catch {
+        throw new ImportError(400, "Not a valid zip archive")      // CHANGED: throw instead of res.status
+    }
+
+    const filesToInsert = []
+    let skippedCount = 0, relevantCount = 0, generatedFiles = 0
+    const ignoredFolders = {}, unsupportedTypes = {}
+
+    for (const entry of zip.getEntries()) {
+        // ... your existing loop body, unchanged, EXCEPT these two places:
+
+        // (a) the "too many files" check
+        //     OLD: return res.status(400).json({ message: `Zip has too many...` })
+        //     NEW:
+        //     throw new ImportError(400, `Zip has too many relevant files (max ${MAX_ENTRIES})`)
+
+        // (b) where you push into filesToInsert
+        //     NEW: build a path that starts with the zip name, and store the source
+        const fullPath = source
+            ? (folderPath ? `${source}/${folderPath}` : source)
+            : folderPath
+
+        filesToInsert.push({
+            project: projectId,
+            filename,
+            path: fullPath,          // CHANGED
+            source,                  // NEW
+            extension: classification.extension,
+            language: classification.language,
+            type: classification.type,
+            size: Buffer.byteLength(content, 'utf-8'),
+            truncated,
+            content
+        })
+    }
+
+    if (filesToInsert.length === 0) {
+        throw new ImportError(400, "No supported code/document files found in this zip")
+    }
+    return { filesToInsert, skippedCount, generatedFiles, ignoredFolders, unsupportedTypes }
+}
+// removes all files (and their chunks/vectors) that came from one zip name
+const removeSource = async (projectId, source) => {
+    const old = await File.find({ project: projectId, source }).select('_id')
+    if (!old.length) return
+    const ids = old.map(f => f._id)
+    await Chunk.deleteMany({ file: { $in: ids } })
+    await Promise.all(ids.map(id => deleteFileVectors(id).catch(() => {})))
+    await File.deleteMany({ _id: { $in: ids } })
+}
+
+const importZips = async (req, res, loadZips, { stripTopFolder = false } = {}) => {
     try {
         const { projectId } = req.params
-
         const project = await findOwnedProject(projectId, req.user.id)
-        if (!project) {
-            return res.status(404).json({ message: "Project not found" })
+        if (!project) return res.status(404).json({ message: "Project not found" })
+
+        if (isRunning(projectId)) {
+            return res.status(409).json({ message: "Indexing is still running, try again shortly" })
         }
 
-        let buffer
+        let zips                                   // [{ buffer, name, source }]
         try {
-            buffer = await loadBuffer()
+            zips = await loadZips()
         } catch (err) {
             if (err.status) return res.status(err.status).json({ message: err.message })
             throw err
         }
 
-        let zip
-        try {
-            zip = new AdmZip(buffer)
-        } catch (err) {
-            return res.status(400).json({ message: "Uploaded file is not a valid zip archive" })
-        }
+        const allToInsert = []
+        const results = []
 
-        const entries = zip.getEntries()
-
-        const filesToInsert = []
-        let skippedCount = 0
-        let relevantCount = 0
-
-        // Why files were skipped, so the UI can show what happened to a big zip
-        const ignoredFolders = {}   // { node_modules: 25000, ".git": 300 }
-        const unsupportedTypes = {} // { css: 40, png: 12 }
-        let generatedFiles = 0      // package-lock.json, *.min.js, *.map
-
-        for (const entry of entries) {
-            if (entry.isDirectory) continue
-
-            let entryName = entry.entryName 
-            if (stripTopFolder) entryName = entryName.split('/').slice(1).join('/')
-            if (!entryName) continue
-            // guard against zip-slip style paths, just in case
-            if (entryName.includes('..')) {
-                skippedCount++
-                continue
-            }
-            const ignoredSegment = findIgnoredSegment(entryName)
-            if (ignoredSegment) {
-                ignoredFolders[ignoredSegment] = (ignoredFolders[ignoredSegment] || 0) + 1
-                skippedCount++
-                continue
-            }
-
-            relevantCount++
-            if (relevantCount > MAX_ENTRIES) {
-                return res.status(400).json({
-                    message: `Zip has too many relevant files (max ${MAX_ENTRIES} after ignoring node_modules/.git/etc.)`
+        for (const { buffer, name, source } of zips) {
+            try {
+                const r = extractZip(buffer, project._id, { stripTopFolder, source })
+                if (source) await removeSource(projectId, source)   // same zip name = replace old version
+                allToInsert.push(...r.filesToInsert)
+                results.push({
+                    zip: name, ok: true,
+                    filesStored: r.filesToInsert.length,
+                    filesSkipped: r.skippedCount,
+                    summary: {
+                        ignoredFolders: r.ignoredFolders,
+                        unsupportedTypes: r.unsupportedTypes,
+                        generatedFiles: r.generatedFiles
+                    }
                 })
+            } catch (err) {
+                if (!err.status) throw err          // real bug -> goes to the outer catch
+                results.push({ zip: name, ok: false, message: err.message })   // this zip failed, others continue
             }
-
-            const filename = entryName.split('/').pop()
-            const folderPath = entryName.includes('/')
-                ? entryName.slice(0, entryName.lastIndexOf('/'))
-                : ""
-
-            const classification = classifyFile(filename)
-            if (!classification) {
-                const ext = getExtension(filename)
-                if (ext && EXTENSION_MAP[ext]) {
-                    generatedFiles++ // supported type, but a lock/minified/map file
-                } else {
-                    const label = ext || "(no extension)"
-                    unsupportedTypes[label] = (unsupportedTypes[label] || 0) + 1
-                }
-                skippedCount++
-                continue
-            }
-
-            const rawBuffer = entry.getData()
-            let content = rawBuffer.toString('utf-8')
-            let truncated = false
-
-            if (Buffer.byteLength(content, 'utf-8') > MAX_FILE_CONTENT_BYTES) {
-                content = content.slice(0, MAX_FILE_CONTENT_BYTES)
-                truncated = true
-            }
-
-            filesToInsert.push({
-                project: project._id,
-                filename,
-                path: folderPath,
-                extension: classification.extension,
-                language: classification.language,
-                type: classification.type,
-                size: Buffer.byteLength(content, 'utf-8'),
-                truncated,
-                content
-            })
         }
 
-        if (filesToInsert.length === 0) {
-            return res.status(400).json({
-                message: "No supported code/document files found in this zip (.js, .jsx, .ts, .tsx, .py, .java, .md, .json)"
-            })
+        if (allToInsert.length === 0) {
+            return res.status(400).json({ message: "No files were stored", results })
         }
 
-        // Which folders the stored files came from (first 3 path segments)
-        const storedByFolder = {}
-        for (const file of filesToInsert) {
-            const label = file.path ? file.path.split("/").slice(0, 3).join("/") : "(root)"
-            storedByFolder[label] = (storedByFolder[label] || 0) + 1
-        }
-
-        const inserted = await File.insertMany(filesToInsert)
-
-        // Files are saved. Chunking/embedding/indexing runs in the background so the
-        // upload returns immediately; the frontend polls /index-status for progress.
-        startIndexJob(project._id, inserted)
+        const inserted = await File.insertMany(allToInsert)
+        startIndexJob(project._id, inserted)       // ONE indexing job for everything
 
         res.status(201).json({
-            message: "Zip processed successfully",
+            message: "Zips processed",
             filesStored: inserted.length,
-            filesSkipped: skippedCount,
+            filesSkipped: results.reduce((n, r) => n + (r.filesSkipped || 0), 0),
+            summary: results.find(r => r.ok)?.summary,   // keeps the old GitHub banner working
             indexing: true,
-            summary: {
-                storedByFolder,
-                ignoredFolders,
-                unsupportedTypes: Object.fromEntries(
-                    Object.entries(unsupportedTypes).sort((a, b) => b[1] - a[1]).slice(0, 8)
-                ),
-                generatedFiles
-            },
-            files: inserted.map((f) => ({
-                _id: f._id,
-                filename: f.filename,
-                path: f.path,
-                extension: f.extension,
-                language: f.language,
-                type: f.type,
-                size: f.size,
-                truncated: f.truncated
-            }))
+            results
         })
-    }
-    catch (err) {
+    } catch (err) {
         console.log(err.message)
         return res.status(500).json({ message: "Internal server error" })
     }
@@ -169,16 +138,23 @@ const importZip = async (req, res, loadBuffer, { stripTopFolder = false } = {}) 
 // ---------------- UPLOAD + EXTRACT ZIP ----------------
 exports.uploadProjectZip = (req, res) => {
     console.log("Inside upload project zip")
-    return importZip(req, res, async () => {
-        if (!req.file) throw new ImportError(400, "No zip file uploaded")
-        return req.file.buffer
+    return importZips(req, res, async () => {
+        if (!req.files?.length) throw new ImportError(400, "No zip files uploaded")
+        return req.files.map(f => ({
+            buffer: f.buffer,
+            name: f.originalname,
+            source: f.originalname.replace(/\.zip$/i, "")
+        }))
     })
 }
 
 // ---------------- IMPORT FROM GITHUB URL ----------------
 exports.importFromGithub = (req, res) => {
     console.log("Inside import from GitHub")
-    return importZip(req, res, () => downloadRepoZip(req.body?.url), { stripTopFolder: true })
+    return importZips(req, res, async () => {
+        const buffer = await downloadRepoZip(req.body?.url)
+        return [{ buffer, name: "github", source: "" }]
+    }, { stripTopFolder: true })
 }
 
 // ---------------- LIST FILES FOR A PROJECT ----------------
@@ -576,5 +552,31 @@ exports.getProjectSummary = async (req, res) => {
     catch (err) {
         console.log(err.message)
         return res.status(500).json({ message: "Could not generate summary: " + err.message })
+    }
+}
+
+// ---------------- DELETE ALL FILES FROM ONE ZIP ----------------
+exports.deleteSource = async (req, res) => {
+    console.log("Inside delete source")
+    try {
+        const { projectId, source } = req.params
+
+        const project = await findOwnedProject(projectId, req.user.id)
+        if (!project) return res.status(404).json({ message: "Project not found" })
+
+        if (isRunning(projectId)) {
+            return res.status(409).json({ message: "Indexing is in progress, try again shortly" })
+        }
+
+        const count = await File.countDocuments({ project: projectId, source })
+        if (count === 0) return res.status(404).json({ message: "No files found for this zip" })
+
+        await removeSource(projectId, source)
+
+        res.status(200).json({ message: "Zip removed successfully", removed: count })
+    }
+    catch (err) {
+        console.log(err.message)
+        return res.status(500).json({ message: "Internal server error" })
     }
 }

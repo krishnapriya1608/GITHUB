@@ -21,5 +21,5 @@ router.get('/index-status', fileController.getIndexStatus)
 router.get('/:fileId', fileController.getFileById)
 router.delete('/:fileId', fileController.deleteFile)
 router.post('/import-github', fileController.importFromGithub)
-
+router.delete('/source/:source', fileController.deleteSource)
 module.exports = router
