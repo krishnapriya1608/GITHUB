@@ -93,13 +93,13 @@ function Home() {
 
   useEffect(() => {
     gsap.timeline({ defaults: { ease: "power3.out" } })
-      .fromTo(".gsap-fade", 
-        { y: 25, opacity: 0 }, 
+      .fromTo(".gsap-fade",
+        { y: 25, opacity: 0 },
         { y: 0, opacity: 1, duration: 0.8, stagger: 0.12 }
       )
-      .fromTo(".gsap-panel", 
-        { x: -20, opacity: 0 }, 
-        { x: 0, opacity: 1, duration: 0.8, stagger: 0.1 }, 
+      .fromTo(".gsap-panel",
+        { x: -20, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.8, stagger: 0.1 },
         "-=0.4"
       );
   }, []);
@@ -120,10 +120,15 @@ function Home() {
           <button type="button" onClick={() => navigate("/login")} className={`${CHIP} text-neutral-400 hover:text-white`}>
             Sign In
           </button>
-          <button type="button" onClick={() => navigate("/dashboard")} className={PRIMARY}>
+          <button type="button" onClick={() => navigate("/dash")} className={PRIMARY}>
             Launch Console ↗
           </button>
         </div>
+        <nav style={{ fontFamily: "Arima, system-ui" }} className="flex items-center space-x-8 text-sm font-medium text-gray-300">
+          <Link to="/" className="hover:text-white transition-colors">Home</Link>
+          <Link to="/features" className="hover:text-white transition-colors">Features</Link>
+          <a href="/team" className="hover:text-white transition-colors">Team</a>
+        </nav>
       </header>
 
       {/* Large Background Typography */}
@@ -135,7 +140,7 @@ function Home() {
       </div>
 
       <main className="relative z-10 mx-auto max-w-7xl px-8 pt-32 pb-24 space-y-28">
-        
+
         {/* Hero Section */}
         <section className="grid grid-cols-1 md:grid-cols-12 gap-10 items-end border-b border-white/5 pb-16">
           <div className="gsap-fade md:col-span-8 space-y-6">
@@ -321,9 +326,9 @@ function Home() {
 
       </main>
 
-    
 
-      <Footer/>
+
+      <Footer />
     </div>
   );
 }

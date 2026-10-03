@@ -39,18 +39,23 @@ function Login() {
 
     return (
         <div className="min-h-screen  bg-[#0d0c11]  text-[#e1e2e6] font-sans flex flex-col justify-between relative overflow-hidden">
-            
+
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#8a72cf]/15 blur-[140px] rounded-full pointer-events-none" />
-               {/* Top Navigation Brand */}
+            {/* Top Navigation Brand */}
             <header className="relative z-10 px-8 py-6 max-w-7xl w-full">
                 <div className="font-bold text-xs tracking-[0.3em] uppercase text-gray-300">
                     Codebase<span className="text-[9px] align-top">®</span>
                 </div>
+                <nav style={{ fontFamily: "Arima, system-ui" }} className="flex items-center space-x-8 text-sm font-medium text-gray-300">
+                    <Link to="/" className="hover:text-white transition-colors">Home</Link>
+                    <Link to="/features" className="hover:text-white transition-colors">Features</Link>
+                    <Link to="/team" className="hover:text-white transition-colors">Team</Link>
+                </nav>
             </header>
 
             {/* Main Content Split View */}
             <main className="relative z-10 flex-1 grid grid-cols-1 lg:grid-cols-12 max-w-7xl mx-auto w-full items-center px-6">
-                
+
                 {/* Left Side: Minimal Visual Graphic / Orb Ring */}
                 <div className="hidden lg:flex lg:col-span-6 items-center justify-center p-12">
                     <div className="relative w-64 h-64 flex items-center justify-center">
@@ -66,11 +71,10 @@ function Login() {
                                     style={{
                                         transform: `translate(${x}px, ${y}px)`,
                                     }}
-                                    className={`absolute w-7 h-7 rounded-full shadow-inner transition-all duration-500 ${
-                                        index === 1
+                                    className={`absolute w-7 h-7 rounded-full shadow-inner transition-all duration-500 ${index === 1
                                             ? "bg-gradient-to-tr from-indigo-600 to-blue-400 opacity-90 shadow-indigo-500/50"
                                             : "bg-gradient-to-b from-[#2a2d34] to-[#16181d] opacity-60 border border-white/5"
-                                    }`}
+                                        }`}
                                 />
                             );
                         })}
@@ -80,7 +84,7 @@ function Login() {
                 {/* Right Side: Elegant Dark Form */}
                 <div className="col-span-12 lg:col-span-6 flex justify-center lg:justify-start lg:pl-12">
                     <div className="w-full max-w-sm space-y-6">
-                        
+
                         {/* Dot Circle Header Icon */}
                         <div className="flex flex-col items-center justify-center space-y-3">
                             <div className="grid grid-cols-3 gap-1.5 w-10 h-6 items-center justify-center">
@@ -168,7 +172,7 @@ function Login() {
                             <div className="text-[11px] text-gray-500">
                                 Don't have an account?{" "}
                                 <Link
-                                    to="/"
+                                    to="/register"
                                     className="text-gray-300 hover:text-white underline underline-offset-2 ml-1 transition-colors"
                                 >
                                     Register
@@ -188,10 +192,10 @@ function Login() {
                     <span>Cosmos</span>
                 </div>
                 <div>
-                     <span className="font-semibold text-gray-400"></span>
+                    <span className="font-semibold text-gray-400"></span>
                 </div>
             </footer>
-            
+
         </div>
     )
 }

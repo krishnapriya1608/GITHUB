@@ -105,8 +105,8 @@ function Register() {
                 </div>
                 <nav style={{ fontFamily: "Arima, system-ui" }} className="flex items-center space-x-8 text-sm font-medium text-gray-300">
                     <Link to="/" className="hover:text-white transition-colors">Home</Link>
-                    <a href="#features" className="hover:text-white transition-colors">Features</a>
-                    <a href="#team" className="hover:text-white transition-colors">Team</a>
+                    <Link to="/features" className="hover:text-white transition-colors">Features</Link>
+                    <a href="/team" className="hover:text-white transition-colors">Team</a>
                 </nav>
             </header>
 

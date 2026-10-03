@@ -7,6 +7,8 @@ import ResetPassword from './Pages/ResetPassword'
 import Dashboard from './Pages/Dashboard'
 import ProjectDetail from './Pages/ProjectDetail'
 import Home from './Pages/Home'
+import Features from './Pages/Features'
+import Team from './Pages/Team'
 
 
 function App() {
@@ -21,6 +23,8 @@ function App() {
       <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="*" element={<Navigate to="/register" replace />} />
       <Route path="/projects/:id" element={<ProjectDetail />} />
+      <Route path="/features" element={<Features />} />
+      <Route path="/team" element={<Team />} />
     </Routes>
   )
 }
