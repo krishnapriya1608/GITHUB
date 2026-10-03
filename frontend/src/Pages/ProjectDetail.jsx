@@ -9,7 +9,8 @@ import {
     deleteFileAPI,
     searchProjectAPI,
     reindexProjectAPI,
-    getIndexStatusAPI
+    getIndexStatusAPI,
+    deleteSourceAPI
 } from '../service/allAPI'
 import AskChat from '../components/AskChat'
 import ArchitectureOverview from '../components/ArchitectureOverview'
