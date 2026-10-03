@@ -48,15 +48,13 @@ function Node({ icon, title, sub, active, onClick, disabled, children }) {
             type={onClick ? 'button' : undefined}
             onClick={onClick}
             disabled={disabled}
-            className={`block w-full rounded-xl border bg-white/[0.03] px-4 py-3.5 text-left transition-colors ${
-                active ? "border-amber-400/40" : "border-white/[0.08]"
-            } ${onClick ? "hover:bg-white/[0.06] disabled:opacity-60" : ""}`}
+            className={`block w-full rounded-xl border bg-white/[0.03] px-4 py-3.5 text-left transition-colors ${active ? "border-amber-400/40" : "border-white/[0.08]"
+                } ${onClick ? "hover:bg-white/[0.06] disabled:opacity-60" : ""}`}
         >
             <span className="flex items-center gap-4">
                 <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-sm text-neutral-200 ${
-                        active ? "border-amber-400/40 bg-amber-400/10" : "border-white/10 bg-white/[0.05]"
-                    }`}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-sm text-neutral-200 ${active ? "border-amber-400/40 bg-amber-400/10" : "border-white/10 bg-white/[0.05]"
+                        }`}
                 >
                     {icon}
                 </span>
@@ -176,41 +174,28 @@ function ProjectDetail() {
     }
 
     const handleFileSelected = async (e) => {
-        const zip = e.target.files[0]
+        const zips = Array.from(e.target.files)
         e.target.value = ""
-        if (!zip) return
-
-        if (!zip.name.toLowerCase().endsWith('.zip')) {
-            return alert("Please select a .zip file")
+        if (!zips.length) return
+        if (zips.some(z => !z.name.toLowerCase().endsWith('.zip'))) {
+            return alert("Please select only .zip files")
         }
 
         const formData = new FormData()
-        formData.append('zipfile', zip)
+        zips.forEach(z => formData.append('zipfiles', z))   // field name must match the route
 
-        setUploading(true)
-        setUploadStatus(null)
+        setUploading(true); setUploadStatus(null)
         try {
             const res = await uploadProjectZipAPI(id, formData)
             if (res.status === 201) {
-                setUploadStatus({
-                    ok: true,
-                    filesStored: res.data.filesStored,
-                    filesSkipped: res.data.filesSkipped,
-                    summary: res.data.summary
-                })
+                setUploadStatus({ ok: true, filesStored: res.data.filesStored, results: res.data.results })
                 setIndexStatus({ state: "indexing", done: 0, total: 0 })
                 loadFiles()
             } else {
                 setUploadStatus({ ok: false, message: res.data?.message || "Upload failed" })
             }
-        }
-        catch (err) {
-            console.log(err.message)
-            setUploadStatus({ ok: false, message: "Something went wrong during upload." })
-        }
-        finally {
-            setUploading(false)
-        }
+        } catch { setUploadStatus({ ok: false, message: "Something went wrong during upload." }) }
+        finally { setUploading(false) }
     }
 
     const handleImportGithub = async (e) => {
@@ -342,12 +327,12 @@ function ProjectDetail() {
     const indexSub = !indexStatus || indexStatus.state === "idle"
         ? "Ready when files are stored"
         : indexing
-        ? indexStatus.total > 0
-            ? `${indexStatus.done} / ${indexStatus.total} chunks`
-            : "Preparing…"
-        : indexStatus.state === "done"
-        ? `${indexStatus.chunksStored} chunks indexed`
-        : "Indexing stopped"
+            ? indexStatus.total > 0
+                ? `${indexStatus.done} / ${indexStatus.total} chunks`
+                : "Preparing…"
+            : indexStatus.state === "done"
+                ? `${indexStatus.chunksStored} chunks indexed`
+                : "Indexing stopped"
 
     return (
         <div
@@ -364,13 +349,7 @@ function ProjectDetail() {
                 FEATURES
             </div>
 
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept=".zip"
-                onChange={handleFileSelected}
-                className="hidden"
-            />
+            <input ref={fileInputRef} type="file" accept=".zip" multiple onChange={handleFileSelected} className="hidden" />
 
             <div className="relative mx-auto max-w-6xl px-6 py-10">
                 {/* Header */}
@@ -471,11 +450,10 @@ function ProjectDetail() {
                 {/* Upload status banner */}
                 {uploadStatus && (
                     <div
-                        className={`mt-8 flex items-start justify-between gap-4 rounded-2xl border px-5 py-4 text-sm ${
-                            uploadStatus.ok
-                                ? "border-white/[0.07] bg-[#101010] text-neutral-200"
-                                : "border-red-500/30 bg-red-500/10 text-red-300"
-                        }`}
+                        className={`mt-8 flex items-start justify-between gap-4 rounded-2xl border px-5 py-4 text-sm ${uploadStatus.ok
+                            ? "border-white/[0.07] bg-[#101010] text-neutral-200"
+                            : "border-red-500/30 bg-red-500/10 text-red-300"
+                            }`}
                     >
                         <div>
                             {uploadStatus.ok ? (
@@ -485,7 +463,7 @@ function ProjectDetail() {
                                             <>Re-indexed <span className="font-medium text-white">{uploadStatus.filesStored}</span> file(s).</>
                                         ) : (
                                             <>Stored <span className="font-medium text-white">{uploadStatus.filesStored}</span> file(s),
-                                            skipped {uploadStatus.filesSkipped}.</>
+                                                skipped {uploadStatus.filesSkipped}.</>
                                         )}
                                         {uploadStatus.chunksStored > 0 && (
                                             <> Generated <span className="font-medium text-white">{uploadStatus.chunksStored}</span> embedded chunk(s).</>
@@ -544,11 +522,10 @@ function ProjectDetail() {
                 {/* Background indexing progress */}
                 {indexStatus && indexStatus.state !== "idle" && (
                     <div
-                        className={`mt-4 rounded-2xl border px-5 py-4 text-sm ${
-                            indexStatus.state === "error"
-                                ? "border-red-500/30 bg-red-500/10 text-red-300"
-                                : "border-white/[0.07] bg-[#101010] text-neutral-200"
-                        }`}
+                        className={`mt-4 rounded-2xl border px-5 py-4 text-sm ${indexStatus.state === "error"
+                            ? "border-red-500/30 bg-red-500/10 text-red-300"
+                            : "border-white/[0.07] bg-[#101010] text-neutral-200"
+                            }`}
                     >
                         <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0 flex-1">
@@ -641,11 +618,10 @@ function ProjectDetail() {
                                         return (
                                             <li
                                                 key={file._id}
-                                                className={`group flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition-colors ${
-                                                    active
-                                                        ? "border-amber-400/40 bg-white/[0.06]"
-                                                        : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.05]"
-                                                }`}
+                                                className={`group flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition-colors ${active
+                                                    ? "border-amber-400/40 bg-white/[0.06]"
+                                                    : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.05]"
+                                                    }`}
                                             >
                                                 <button
                                                     type="button"
@@ -653,11 +629,10 @@ function ProjectDetail() {
                                                     className="flex min-w-0 flex-1 items-center gap-2 text-left"
                                                 >
                                                     <span
-                                                        className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-medium uppercase ${
-                                                            file.type === "code"
-                                                                ? "border-white/15 bg-white/[0.06] text-neutral-200"
-                                                                : "border-amber-400/30 bg-amber-400/10 text-amber-300"
-                                                        }`}
+                                                        className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-medium uppercase ${file.type === "code"
+                                                            ? "border-white/15 bg-white/[0.06] text-neutral-200"
+                                                            : "border-amber-400/30 bg-amber-400/10 text-amber-300"
+                                                            }`}
                                                     >
                                                         {file.extension}
                                                     </span>
@@ -683,7 +658,7 @@ function ProjectDetail() {
                         </div>
                         <CardFooter
                             title=""
-                            // text="Browse every stored file and open any of them in the preview below."
+                        // text="Browse every stored file and open any of them in the preview below."
                         />
                     </div>
 
@@ -726,7 +701,7 @@ function ProjectDetail() {
                             </Node>
                         </div>
                         <CardFooter
-                            // text="Upload a zip, store the files, then index them for search and Ask."
+                        // text="Upload a zip, store the files, then index them for search and Ask."
                         >
                             <button
                                 type="button"
@@ -785,11 +760,10 @@ function ProjectDetail() {
                                             key={f._id}
                                             title={`${f.filename} · ${formatBytes(f.size)}`}
                                             style={{ height: `${Math.max(12, (f.size / maxSize) * 100)}%` }}
-                                            className={`flex-1 rounded-t-md ${
-                                                i === maxIdx
-                                                    ? "bg-gradient-to-t from-white/10 to-amber-300/50"
-                                                    : "bg-gradient-to-t from-white/[0.03] to-white/[0.12]"
-                                            }`}
+                                            className={`flex-1 rounded-t-md ${i === maxIdx
+                                                ? "bg-gradient-to-t from-white/10 to-amber-300/50"
+                                                : "bg-gradient-to-t from-white/[0.03] to-white/[0.12]"
+                                                }`}
                                         />
                                     ))
                                 )}

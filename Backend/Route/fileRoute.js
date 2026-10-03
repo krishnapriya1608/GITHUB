@@ -7,7 +7,7 @@ const router = express.Router({ mergeParams: true }) // needed to read :projectI
 
 router.use(authMiddleware)
 
-router.post('/upload', uploadZip.single('zipfile'), fileController.uploadProjectZip)
+router.post('/upload', uploadZip.array('zipfiles', 10), fileController.uploadProjectZip)
 router.post('/search', fileController.searchProject)
 router.post('/ask-stream', fileController.askProjectStream)
 router.get('/messages', fileController.getChatHistory)

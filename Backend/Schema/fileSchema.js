@@ -41,10 +41,11 @@ const fileSchema = new mongoose.Schema({
     content: {
         type: String,
         default: ""
-    }
+    },
+    source: { type: String, default: "" },   
 }, { timestamps: true })
 
-fileSchema.index({ project: 1, path: 1, filename: 1 })
+fileSchema.index({ project: 1, path: 1,source: 1, filename: 1 })
 
 const File = mongoose.model('File', fileSchema)
 module.exports = File
